@@ -19,3 +19,10 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+# Screenshots and temp artifacts
+*.png
+*.yaml
+.playwright-cli/
+
+# Vite cache
+.vite/

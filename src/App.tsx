@@ -1,53 +1,72 @@
+/**
+ * 根组件
+ * Canvas + Scene（地形/水/光照/天空/岩石/相机/后处理）+ UI 层
+ * gl 设置：NoToneMapping（后处理接管）、sRGB 输出、阴影开启。
+ */
+import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { Suspense, useCallback } from 'react'
 import * as THREE from 'three'
-import Scene from './components/scene/Scene'
-import UI from './components/ui/UI'
-import FPSDisplay from './components/ui/FPSDisplay'
-import { useTime } from './hooks/useTime'
-import type { TimeOfDay } from './types'
+import Terrain from './world/Terrain'
+import Water from './water/Water'
+import River from './world/River'
+import Structures from './world/Structures'
+import Lighting from './lighting/Lighting'
+import SkyDome from './lighting/SkyDome'
+import CameraRig from './camera/CameraRig'
+import Effects from './postprocessing/Effects'
+import Vegetation from './environment/Vegetation'
+import AudioUpdater from './audio/AudioUpdater'
+import UI from './ui/UI'
+import { CAMERA, PERF } from './config/constants'
 
-function App() {
-  const { hour, setHour, timeOfDay, timeState, setTimePreset } = useTime(16)
-
-  const handleCameraReset = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('camera-reset'))
-  }, [])
-
+function Scene() {
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#1a1a2e' }}>
+    <>
+      <SkyDome />
+      <Lighting />
+      <Terrain />
+      <Water />
+      <River />
+      <Structures />
+      <Vegetation />
+      <CameraRig />
+      <AudioUpdater />
+      <Effects />
+    </>
+  )
+}
+
+export default function App() {
+  return (
+    <>
       <Canvas
+        frameloop="demand"
         shadows
-        camera={{ position: [14, 14, 14], fov: 45, near: 0.1, far: 200 }}
+        dpr={[1, PERF.maxDpr]}
         gl={{
-          antialias: true,
-          outputColorSpace: 'srgb',
+          antialias: false,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.0,
+          powerPreference: 'high-performance',
         }}
-        dpr={[1, 2]}
+        camera={{
+          fov: 42,
+          near: 0.1,
+          far: 1000,
+          position: CAMERA.initialPosition,
+        }}
         onCreated={({ gl }) => {
+          gl.outputColorSpace = THREE.SRGBColorSpace
+          gl.toneMapping = THREE.ACESFilmicToneMapping
+          gl.toneMappingExposure = 1.0
           gl.shadowMap.type = THREE.PCFSoftShadowMap
         }}
       >
         <Suspense fallback={null}>
-          <Scene
-            timeState={timeState}
-            hour={hour}
-            timeOfDay={timeOfDay}
-          />
+          <Scene />
         </Suspense>
       </Canvas>
-
-      {/* UI overlay - outside Canvas */}
-      <FPSDisplay />
-      <UI
-        hour={hour}
-        timeOfDay={timeOfDay}
-        onHourChange={setHour}
-        onTimePreset={setTimePreset}
-        onCameraReset={handleCameraReset}
-      />
-    </div>
+      <UI />
+    </>
   )
 }
-
-export default App

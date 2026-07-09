@@ -1,7 +1,6 @@
 /**
- * 根组件
- * Canvas + Scene（地形/水/光照/天空/岩石/相机/后处理）+ UI 层
- * gl 设置：NoToneMapping（后处理接管）、sRGB 输出、阴影开启。
+ * 根组件 — 版本C（融合版）
+ * Canvas: frameloop="demand" + Effects 接管渲染 + three 内置 ACES
  */
 import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
@@ -10,6 +9,7 @@ import Terrain from './world/Terrain'
 import Water from './water/Water'
 import River from './world/River'
 import Structures from './world/Structures'
+import ExhibitionBase from './world/ExhibitionBase'
 import Lighting from './lighting/Lighting'
 import SkyDome from './lighting/SkyDome'
 import CameraRig from './camera/CameraRig'
@@ -28,6 +28,7 @@ function Scene() {
       <Water />
       <River />
       <Structures />
+      <ExhibitionBase />
       <Vegetation />
       <CameraRig />
       <AudioUpdater />
@@ -59,7 +60,7 @@ export default function App() {
           gl.outputColorSpace = THREE.SRGBColorSpace
           gl.toneMapping = THREE.ACESFilmicToneMapping
           gl.toneMappingExposure = 1.0
-          gl.shadowMap.type = THREE.PCFSoftShadowMap
+          gl.shadowMap.type = THREE.PCFShadowMap
         }}
       >
         <Suspense fallback={null}>

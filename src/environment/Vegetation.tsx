@@ -12,6 +12,8 @@ import Driftwood from './Driftwood'
 import Clouds from './Clouds'
 import Birds from './Birds'
 import Fish from './Fish'
+import Particles from './Particles'
+import MarineElements from './MarineElements'
 
 export default function Vegetation() {
   return (
@@ -22,9 +24,11 @@ export default function Vegetation() {
       <Forest />
       <Rocks />
       <Driftwood />
+      <MarineElements />
       <Clouds />
       <Birds />
       <Fish />
+      <Particles />
     </>
   )
 }

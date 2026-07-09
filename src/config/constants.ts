@@ -53,13 +53,13 @@ export const CAMERA = {
 /** 性能开关 */
 export const PERF = {
   /** 草实例数上限 */
-  grassCount: 16000,
+  grassCount: 9000,
   /** 花实例数上限 */
-  flowerCount: 2600,
+  flowerCount: 1500,
   /** 灌木实例数上限 */
-  bushCount: 1200,
+  bushCount: 700,
   /** 树实例数上限 */
-  treeCount: 520,
+  treeCount: 320,
   /** 岩石实例数上限 */
   rockCount: 140,
   /** 漂流木实例数上限 */

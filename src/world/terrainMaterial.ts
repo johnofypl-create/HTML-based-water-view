@@ -88,26 +88,26 @@ export function createTerrainMaterial(): TerrainMaterial {
          varying float vHeight;
          varying vec3 vWorldNormal;
 
-         // 自然调色板
-         vec3 sandDry()   { return vec3(0.85, 0.76, 0.60); }
-         vec3 sandWet()   { return vec3(0.72, 0.61, 0.45); }
-         vec3 duneCol()   { return vec3(0.79, 0.68, 0.52); }
-         vec3 grassBright(){ return vec3(0.54, 0.60, 0.35); }
-         vec3 grassMid()  { return vec3(0.44, 0.51, 0.27); }
-         vec3 grassDry()  { return vec3(0.64, 0.60, 0.37); }
-         vec3 bushCol()   { return vec3(0.25, 0.35, 0.20); }
-         vec3 forestDeep(){ return vec3(0.17, 0.27, 0.16); }
-         vec3 forestMid() { return vec3(0.23, 0.35, 0.20); }
-         vec3 forestLight(){ return vec3(0.29, 0.42, 0.24); }
-         vec3 rockLight() { return vec3(0.60, 0.56, 0.53); }
-         vec3 rockMid()   { return vec3(0.48, 0.44, 0.41); }
-         vec3 rockDark()  { return vec3(0.35, 0.31, 0.28); }
-         vec3 wetSeaBed() { return vec3(0.55, 0.52, 0.42); }
-         vec3 deepSeaBed(){ return vec3(0.30, 0.34, 0.38); }
+         // 自然调色板（提亮+增饱和，向明亮玩具感靠拢）
+         vec3 sandDry()   { return vec3(0.90, 0.81, 0.64); }
+         vec3 sandWet()   { return vec3(0.77, 0.65, 0.49); }
+         vec3 duneCol()   { return vec3(0.84, 0.73, 0.56); }
+         vec3 grassBright(){ return vec3(0.62, 0.70, 0.42); }
+         vec3 grassMid()  { return vec3(0.52, 0.61, 0.33); }
+         vec3 grassDry()  { return vec3(0.70, 0.66, 0.42); }
+         vec3 bushCol()   { return vec3(0.30, 0.42, 0.25); }
+         vec3 forestDeep(){ return vec3(0.21, 0.33, 0.22); }
+         vec3 forestMid() { return vec3(0.28, 0.42, 0.27); }
+         vec3 forestLight(){ return vec3(0.35, 0.50, 0.30); }
+         vec3 rockLight() { return vec3(0.64, 0.60, 0.56); }
+         vec3 rockMid()   { return vec3(0.52, 0.47, 0.43); }
+         vec3 rockDark()  { return vec3(0.39, 0.34, 0.30); }
+         vec3 wetSeaBed() { return vec3(0.58, 0.55, 0.45); }
+         vec3 deepSeaBed(){ return vec3(0.33, 0.37, 0.41); }
 
          // 顶面 biome 颜色（按高度 + 坡度）
          vec3 topBiomeColor(float h, float slope, vec2 wp) {
-           float n = vnoise(wp * 0.6) * 0.12 - 0.06; // 微变化
+           float n = vnoise(wp * 0.5) * 0.05 - 0.025; // 微变化（减弱，大色块感）
            vec3 col;
            if (h < -2.0) {
              col = mix(deepSeaBed(), wetSeaBed(), smoothstep(-4.0, -2.0, h));
@@ -185,9 +185,9 @@ export function createTerrainMaterial(): TerrainMaterial {
              // 水下整体偏冷偏暗
             diffuseColor.rgb *= mix(1.0, 0.55, smoothstep(0.0, 3.0, depth));
           }
-          // 微妙饱和度补偿（ACES tonemapping 自然会降饱和）
+          // 饱和度补偿（ACES tonemapping 会降饱和，主动拉回）
           float lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.05 - lum * 0.035, 0.4);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.18 - lum * 0.09, 0.55);
         }
         `,
       )

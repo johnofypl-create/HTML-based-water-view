@@ -47,7 +47,7 @@ export default function App() {
         gl={{
           antialias: false,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.0,
+          toneMappingExposure: 1.28,
           powerPreference: 'high-performance',
         }}
         camera={{
@@ -59,7 +59,7 @@ export default function App() {
         onCreated={({ gl }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace
           gl.toneMapping = THREE.ACESFilmicToneMapping
-          gl.toneMappingExposure = 1.0
+          gl.toneMappingExposure = 1.28
           gl.shadowMap.type = THREE.PCFShadowMap
         }}
       >

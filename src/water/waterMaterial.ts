@@ -135,10 +135,10 @@ const fragmentShader = /* glsl */ `
     float foam = clamp(foamLine + foamCrest, 0.0, 1.0);
     lit = mix(lit, uFoamCol, foam * 0.85);
 
-    // 透明度：浅水半透显沙底，深水近不透明
-    float alpha = mix(0.72, 0.96, smoothstep(0.0, 2.5, depth));
+    // 透明度：浅水更透显沙底，深水近不透明（清澈感）
+    float alpha = mix(0.58, 0.93, smoothstep(0.0, 2.5, depth));
     alpha = mix(alpha, 1.0, foam * 0.6);
-    alpha = mix(alpha, 1.0, fres * 0.5);
+    alpha = mix(alpha, 1.0, fres * 0.35);
 
     // 手动指数雾
     float dist = length(uCameraPos - vWorldPos);
@@ -167,9 +167,9 @@ export function createWaterMaterial(): WaterMaterial {
     uHeightTex: { value: getHeightFieldTexture() },
     uWorldSize: { value: WORLD_SIZE },
     uWaterLevel: { value: WATER_LEVEL },
-    uShallowCol: { value: new THREE.Color('#5fc8c0') },
-    uMidCol: { value: new THREE.Color('#3aa0b8') },
-    uDeepCol: { value: new THREE.Color('#1c5a7a') },
+    uShallowCol: { value: new THREE.Color('#56d6c8') },
+    uMidCol: { value: new THREE.Color('#2fb0c4') },
+    uDeepCol: { value: new THREE.Color('#15688f') },
     uFoamCol: { value: new THREE.Color('#f4f0e6') },
     uFogColor: { value: new THREE.Color('#d4e2ea') },
     uFogDensity: { value: 0.011 },

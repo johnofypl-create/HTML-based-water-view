@@ -225,17 +225,12 @@ export function updateWaterMaterial(
 ) {
   mat.uniforms.uTime.value = time
   mat.uniforms.uCameraPos.value.copy(cameraPos)
-  mat.uniforms.uSunDir.value.copy(lightingStateSunDir())
-  mat.uniforms.uSunColor.value.copy(lightingStateSunColor())
-  mat.uniforms.uFogColor.value.copy(lightingStateFogColor())
-  mat.uniforms.uFogDensity.value = lightingStateFogDensity()
-  mat.uniforms.uSkyColor.value.copy(lightingStateSkyColor())
+  mat.uniforms.uSunDir.value.copy(lightingState.sunDir)
+  mat.uniforms.uSunColor.value.copy(lightingState.sunColor)
+  mat.uniforms.uFogColor.value.copy(lightingState.fogColor)
+  mat.uniforms.uFogDensity.value = lightingState.fogDensity
+  mat.uniforms.uSkyColor.value.copy(lightingState.hemiSky)
 }
 
-// 从 lightingState 读取（避免循环依赖直接 import）
-import { lightingState } from '../state/lightingState'
-const lightingStateSunDir = () => lightingState.sunDir
-const lightingStateSunColor = () => lightingState.sunColor
-const lightingStateFogColor = () => lightingState.fogColor
-const lightingStateFogDensity = () => lightingState.fogDensity
-const lightingStateSkyColor = () => lightingState.hemiSky
+// 直接从已 import 的 lightingState 读取（见顶部 import；实测不构成循环依赖，无需 wrapper）
+

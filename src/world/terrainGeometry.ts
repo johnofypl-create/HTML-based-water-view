@@ -1,4 +1,13 @@
 /**
+ * @module world/terrainGeometry
+ * @layer world（域层）
+ * @purpose 地形几何生成（高度场 → 网格 + 岩层裙边）
+ * @dependsOn ['utils/terrain', 'config/constants']
+ * @exports [TerrainGeometryResult, createTerrainGeometry]
+ * @aiEdit
+ *   - 改本文件导出的 TerrainGeometryResult、createTerrainGeometry 即可；依赖见 @dependsOn
+ */
+/**
  * 地形几何生成
  *  - PlaneGeometry grid，用 heightAt 位移每个顶点 Y
  *  - 四边向下 extrude 到 BASE_Y 形成截面裙边（物理模型感）

@@ -1,4 +1,13 @@
 /**
+ * @module audio/noiseBuffer
+ * @layer audio（域层）
+ * @purpose 白/粉噪声缓冲生成
+ * @dependsOn []
+ * @exports [getWhiteNoise, getPinkNoise]
+ * @aiEdit
+ *   - 改本文件导出的 getWhiteNoise、getPinkNoise 即可；依赖见 @dependsOn
+ */
+/**
  * 噪声 AudioBuffer（白噪/粉噪），各声音层复用。
  * 一次性生成 2 秒循环 buffer。
  */

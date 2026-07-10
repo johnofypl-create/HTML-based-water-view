@@ -1,4 +1,13 @@
 /**
+ * @module utils/math
+ * @layer utils（叶子层）
+ * @purpose 数学工具（clamp/lerp/smoothstep/噪声种子等纯函数）
+ * @dependsOn []
+ * @exports [clamp, lerp, remap, smoothstep, smootherstep, TAU, lerpAngle, lerpTime, lerpVec3, findKeyframe, gaussian, mulberry32]
+ * @aiEdit
+ *   - 改本文件导出的 clamp、lerp、remap、smoothstep、smootherstep、TAU、lerpAngle、lerpTime、lerpVec3、findKeyframe、gaussian、mulberry32 即可；依赖见 @dependsOn
+ */
+/**
  * 通用数学工具
  * clamp / lerp / remap / smoothstep / easing / 色相工具
  */

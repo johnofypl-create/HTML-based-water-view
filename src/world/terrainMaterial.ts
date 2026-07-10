@@ -1,4 +1,13 @@
 /**
+ * @module world/terrainMaterial
+ * @layer world（域层）
+ * @purpose 地形材质工厂（生物群系配色 + 噪声细节）
+ * @dependsOn ['utils/glslChunks', 'config/constants']
+ * @exports [TerrainMaterial, createTerrainMaterial, updateTerrainMaterial]
+ * @aiEdit
+ *   - 改本文件导出的 TerrainMaterial、createTerrainMaterial、updateTerrainMaterial 即可；依赖见 @dependsOn
+ */
+/**
  * 地形材质
  * MeshStandardMaterial + onBeforeCompile，注入：
  *  1. biome 混色（按高度 + 坡度）

@@ -1,4 +1,13 @@
 /**
+ * @module water/heightField
+ * @layer water（域层）
+ * @purpose 地形高度场 DataTexture 生成与 UV 映射（物理水/着色器采样用）
+ * @dependsOn ['utils/terrain', 'config/constants']
+ * @exports [getHeightFieldTexture, worldToHeightUV]
+ * @aiEdit
+ *   - 改本文件导出的 getHeightFieldTexture、worldToHeightUV 即可；依赖见 @dependsOn
+ */
+/**
  * 地形高度场纹理
  * 把 heightAt 烘焙成一张 DataTexture，供水着色器采样计算水深/深度色。
  * 世界坐标 (x, z) ↔ UV 通过 uWorldSize/uTexSize 统一映射。

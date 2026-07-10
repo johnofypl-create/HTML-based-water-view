@@ -1,4 +1,13 @@
 /**
+ * @module water/gerstner.glsl
+ * @layer water（域层）
+ * @purpose Gerstner 波 GLSL 生成（与 gerstner.ts 同源，供顶点位移）
+ * @dependsOn ['water/gerstner']
+ * @exports [GERSTNER_GLSL]
+ * @aiEdit
+ *   - 调波形/风向 → 改本文件（与 gerstner.ts 同源）；数值改动属算法层，本次重构不动
+ */
+/**
  * 由 GERSTNER_WAVES（单一事实源）「生成」的 GLSL 函数字符串。
  *
  * 导出 GERSTNER_GLSL，内含：

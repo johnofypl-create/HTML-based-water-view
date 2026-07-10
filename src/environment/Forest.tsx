@@ -1,4 +1,13 @@
 /**
+ * @module environment/Forest
+ * @layer environment（域层）
+ * @purpose 树森林实例层
+ * @dependsOn ['environment/InstancedFoliage', 'environment/vegetationData', 'config/palette', 'utils/mergeGeometry']
+ * @exports [Forest, Forest]
+ * @aiEdit
+ *   - 改本文件导出的 Forest、Forest 即可；依赖见 @dependsOn
+ */
+/**
  * 森林（InstancedMesh）
  * 两种树几何（针叶锥 + 阔叶球），合并干+冠，冠层整体轻摆。
  * 颜色按实例相位在深绿→中绿间变化。

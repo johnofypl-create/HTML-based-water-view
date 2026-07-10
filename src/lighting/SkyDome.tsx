@@ -1,4 +1,13 @@
 /**
+ * @module lighting/SkyDome
+ * @layer lighting（域层）
+ * @purpose 天空穹顶着色器（昼夜渐变）
+ * @dependsOn ['state/lightingState']
+ * @exports [SkyDome, SkyDome]
+ * @aiEdit
+ *   - 改本文件导出的 SkyDome、SkyDome 即可；依赖见 @dependsOn
+ */
+/**
  * 天空穹顶
  * 大球壳内表面，渐变 shader（skyTop → skyBottom 按 y 方向）。
  * 跟随相机位置，永远包围相机。颜色每帧从 lightingState 更新。

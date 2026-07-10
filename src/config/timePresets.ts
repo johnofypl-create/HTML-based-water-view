@@ -1,4 +1,13 @@
 /**
+ * @module config/timePresets
+ * @layer config（叶子层）
+ * @purpose 昼夜关键帧（天空/光/雾/海色）
+ * @dependsOn []
+ * @exports [TimeKeyframe, TIME_KEYFRAMES, KEYFRAME_TIMES]
+ * @aiEdit
+ *   - 调昼夜关键帧（天空/光/雾/海色）→ 直接改 TIME_KEYFRAMES
+ */
+/**
  * 日夜关键帧
  * 5 个关键时刻：dawn(5) / noon(12) / afternoon(15) / sunset(18.5) / night(23)
  * 每帧含完整光照/雾/天空/后处理参数。computeLighting 按小时环形插值。

@@ -1,4 +1,13 @@
 /**
+ * @module environment/Fish
+ * @layer environment（域层）
+ * @purpose 鱼群
+ * @dependsOn ['config/constants']
+ * @exports [Fish, Fish]
+ * @aiEdit
+ *   - 改本文件导出的 Fish、Fish 即可；依赖见 @dependsOn
+ */
+/**
  * 水下鱼群
  * 几条小鱼在浅水区随机游动，偶尔可见（水下深色剪影）。
  */

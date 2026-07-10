@@ -1,4 +1,13 @@
 /**
+ * @module world/River
+ * @layer world（域层）
+ * @purpose 河流组件
+ * @dependsOn ['utils/terrain', 'config/constants', 'state/lightingState']
+ * @exports [River, River]
+ * @aiEdit
+ *   - 改本文件导出的 River、River 即可；依赖见 @dependsOn
+ */
+/**
  * 河流
  * 沿 Catmull-Rom 样条生成水面 strip，复用水着色器但加流向。
  * 河流水面略高于海面避免 Z-fighting，入海口用泡沫过渡。

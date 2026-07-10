@@ -1,4 +1,13 @@
 /**
+ * @module utils/noise
+ * @layer utils（叶子层）
+ * @purpose 值噪声/fBm/ridge 噪声函数
+ * @dependsOn ['utils/math', 'config/constants']
+ * @exports [fbm, ridge, noise]
+ * @aiEdit
+ *   - 改本文件导出的 fbm、ridge、noise 即可；依赖见 @dependsOn
+ */
+/**
  * 噪声封装
  * 基于 simplex-noise，种子化、可复现。提供多层 fBm。
  * heightAt / 植被分布 / 河流样条共用同一实例，保证一致。

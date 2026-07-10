@@ -1,4 +1,13 @@
 /**
+ * @module config/biomeConfig
+ * @layer config（叶子层）
+ * @purpose 生物群系枚举/高度带/密度配置
+ * @dependsOn []
+ * @exports [Biome, BiomeInfo, BIOME_HEIGHTS, BIOME_SLOPES, classifyBiome, BIOME_DENSITY]
+ * @aiEdit
+ *   - 改本文件导出的 Biome、BiomeInfo、BIOME_HEIGHTS、BIOME_SLOPES、classifyBiome、BIOME_DENSITY 即可；依赖见 @dependsOn
+ */
+/**
  * Biome 配置
  * 按高度 + 坡度判定地形生态，决定材质颜色与植被密度。
  */

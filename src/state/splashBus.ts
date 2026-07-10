@@ -1,3 +1,12 @@
+/**
+ * @module state/splashBus
+ * @layer state（状态层）
+ * @purpose 事件总线（地形改造溅水发布/订阅），解耦发射与渲染
+ * @dependsOn []
+ * @exports [SplashEvent, splashBus]
+ * @aiEdit
+ *   - 触发地形改造溅水 → splashBus.emit({pos,intensity})，无需改 SprayParticles
+ */
 import * as THREE from 'three'
 
 export interface SplashEvent {

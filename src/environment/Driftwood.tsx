@@ -1,4 +1,13 @@
 /**
+ * @module environment/Driftwood
+ * @layer environment（域层）
+ * @purpose 漂流木实例层
+ * @dependsOn ['environment/InstancedFoliage', 'environment/vegetationData', 'config/palette']
+ * @exports [Driftwood, Driftwood]
+ * @aiEdit
+ *   - 改本文件导出的 Driftwood、Driftwood 即可；依赖见 @dependsOn
+ */
+/**
  * 漂流木（InstancedMesh）
  * 长条圆木，木色，搁浅在水线附近。轻摆（被浪推）。
  */

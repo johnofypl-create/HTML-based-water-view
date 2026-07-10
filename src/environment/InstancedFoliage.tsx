@@ -1,4 +1,13 @@
 /**
+ * @module environment/InstancedFoliage
+ * @layer environment（域层）
+ * @purpose 实例化植被材质工厂（风摆）
+ * @dependsOn ['utils/sampling', 'animation/vertexShaders', 'state/lightingState']
+ * @exports [InstancedFoliage, InstancedFoliage]
+ * @aiEdit
+ *   - 改本文件导出的 InstancedFoliage、InstancedFoliage 即可；依赖见 @dependsOn
+ */
+/**
  * 通用实例化植被组件
  * 接收几何/材质/实例数据/摇摆参数，创建 InstancedMesh + aPhase 实例属性，
  * useFrame 更新 uTime 与风强度（午后略强）。

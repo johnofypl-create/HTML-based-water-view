@@ -1,4 +1,13 @@
 /**
+ * @module water/sprayShader
+ * @layer water（域层）
+ * @purpose 飞溅粒子顶点/片段着色器（弹道积分 + 软圆点）
+ * @dependsOn []
+ * @exports [sprayVertexShader, sprayFragmentShader]
+ * @aiEdit
+ *   - 改本文件导出的 sprayVertexShader、sprayFragmentShader 即可；依赖见 @dependsOn
+ */
+/**
  * 飞溅粒子 GLSL：顶点闭式弹道积分 + 软圆点 + 淡入淡出。
  * 无状态（粒子轨迹只依赖 {spawnPos, aVel, aSpawnTime, aLife, aSeed}）。
  *

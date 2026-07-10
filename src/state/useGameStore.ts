@@ -1,4 +1,13 @@
 /**
+ * @module state/useGameStore
+ * @layer state（状态层）
+ * @purpose zustand 全局 UI/时间/相机状态（响应式，组件用 hook 订阅）
+ * @dependsOn ['config/constants']
+ * @exports [GameStore, useGameStore]
+ * @aiEdit
+ *   - 改本文件导出的 GameStore、useGameStore 即可；依赖见 @dependsOn
+ */
+/**
  * 全局游戏状态（zustand）
  * UI 与音频只读写 state，不直接碰 Three 对象。
  * timeOfDay / uiVisible / started(音频) / cameraResetSignal

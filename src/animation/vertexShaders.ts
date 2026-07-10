@@ -1,4 +1,13 @@
 /**
+ * @module animation/vertexShaders
+ * @layer animation（域层）
+ * @purpose 风摆顶点着色器材质工厂
+ * @dependsOn []
+ * @exports [SwayUniforms, SwayOpts, makeSwayMaterial]
+ * @aiEdit
+ *   - 改本文件导出的 SwayUniforms、SwayOpts、makeSwayMaterial 即可；依赖见 @dependsOn
+ */
+/**
  * 顶点动画着色器注入
  * 为 InstancedMesh 的 MeshStandardMaterial 注入风摇摆：
  *  - 实例属性 aPhase（每实例随机相位）

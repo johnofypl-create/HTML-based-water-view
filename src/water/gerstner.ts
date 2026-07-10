@@ -1,4 +1,13 @@
 /**
+ * @module water/gerstner
+ * @layer water（域层）
+ * @purpose Gerstner 波单一事实源（TS 端采样，供 CPU 发射器/物理用）
+ * @dependsOn []
+ * @exports [GerstnerWave, GERSTNER_WAVES, primaryWindDir, GerstnerSample, sampleGerstner]
+ * @aiEdit
+ *   - 调波形/风向 → 改 GERSTNER_WAVES 数组与 primaryWindDir（与 gerstner.glsl.ts 同源）
+ */
+/**
  * Gerstner 波「单一事实源」
  *
  * 这里定义唯一一份波参数数组 GERSTNER_WAVES。

@@ -1,4 +1,13 @@
 /**
+ * @module ui/UI
+ * @layer ui（域层）
+ * @purpose UI 叠层（时间/可见性控制）
+ * @dependsOn ['state/useGameStore', 'audio/AudioManager', 'config/constants']
+ * @exports [UI, UI]
+ * @aiEdit
+ *   - 改本文件导出的 UI、UI 即可；依赖见 @dependsOn
+ */
+/**
  * UI 覆盖层
  * 极简：启动遮罩 + 时间滑块/预设 + 相机重置/隐藏UI/全屏
  * 纯 HTML，pointer-events 分层。读写 useGameStore，不碰 Three。

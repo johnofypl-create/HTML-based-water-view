@@ -1,4 +1,13 @@
 /**
+ * @module postprocessing/Effects
+ * @layer postprocessing（域层）
+ * @purpose 后处理链（Bloom + DoF + SMAA + 输出，frameloop=demand 常驻 invalidate）
+ * @dependsOn ['state/lightingState']
+ * @exports [Effects, Effects]
+ * @aiEdit
+ *   - 改本文件导出的 Effects、Effects 即可；依赖见 @dependsOn
+ */
+/**
  * 后处理管线（three 内置 EffectComposer）
  *
  * 与 App.tsx Canvas `frameloop="demand"` 配合。

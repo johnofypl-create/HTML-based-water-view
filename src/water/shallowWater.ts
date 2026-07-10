@@ -1,4 +1,13 @@
 /**
+ * @module water/shallowWater
+ * @layer water（域层）
+ * @purpose 高度场浅水 Virtual Pipes 参考求解器（CPU，物理水 P0）
+ * @dependsOn []
+ * @exports [ShallowState, ShallowParams, makeState, totalWater, maxSurfaceSlope, step, pour]
+ * @aiEdit
+ *   - 调物理稳定性 → 改 K/dt 与 outBuffer 钳制（见本文件注释）；数值改动属算法层，本次重构不动
+ */
+/**
  * 高度场浅水求解器（Virtual Pipes 方法 — CPU 参考实现）
  * =====================================================================
  * 用途：P0 原型 —— 验证"动态地形 → 水实时流入洼地"在数值上能收敛。

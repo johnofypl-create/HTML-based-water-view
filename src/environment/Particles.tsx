@@ -1,4 +1,13 @@
 /**
+ * @module environment/Particles
+ * @layer environment（域层）
+ * @purpose 漂浮光点粒子
+ * @dependsOn ['config/constants']
+ * @exports [Particles, Particles]
+ * @aiEdit
+ *   - 改本文件导出的 Particles、Particles 即可；依赖见 @dependsOn
+ */
+/**
  * 浮动粒子（大气微尘/海沫）
  * 150 个柔和光点在场景上方缓慢上升+水平漂移，增添氛围深度。
  * 从版本 A 移入。

@@ -1,4 +1,13 @@
 /**
+ * @module environment/Grass
+ * @layer environment（域层）
+ * @purpose 草实例层
+ * @dependsOn ['environment/InstancedFoliage', 'environment/vegetationData', 'config/palette']
+ * @exports [Grass, Grass]
+ * @aiEdit
+ *   - 改本文件导出的 Grass、Grass 即可；依赖见 @dependsOn
+ */
+/**
  * 草地（InstancedMesh）
  * 细长 blade 几何，顶端摇摆，多色绿变化。tipOnly 摇摆。
  */

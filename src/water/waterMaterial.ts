@@ -1,4 +1,13 @@
 /**
+ * @module water/waterMaterial
+ * @layer water（域层）
+ * @purpose 海面着色器材质工厂（Gerstner 位移 + Jacobian 白帽 + 岸线湿边）
+ * @dependsOn ['utils/glslChunks', 'config/constants', 'water/heightField', 'water/gerstner.glsl', 'state/lightingState']
+ * @exports [WaterMaterial, createWaterMaterial, updateWaterMaterial]
+ * @aiEdit
+ *   - 调泡沫密度/颜色 → 改 fragment 的 applyFoam 与 uFoam*；调波形 → 改 gerstner.glsl.ts；调昼夜响应 → 改 updateWaterMaterial 中 lightingState.* 读取
+ */
+/**
  * 水着色器材质（海洋）
  * 自定义 ShaderMaterial：
  *  顶点：Gerstner 波位移 + 解析法线重算
@@ -12,6 +21,7 @@ import { GLSL_HASH } from '../utils/glslChunks'
 import { WATER_LEVEL, WORLD_SIZE } from '../config/constants'
 import { getHeightFieldTexture } from './heightField'
 import { GERSTNER_GLSL } from './gerstner.glsl'
+import { lightingState } from '../state/lightingState'
 
 export interface WaterMaterial extends THREE.ShaderMaterial {
   uniforms: {

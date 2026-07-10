@@ -1,4 +1,13 @@
 /**
+ * @module environment/Flowers
+ * @layer environment（域层）
+ * @purpose 花实例层
+ * @dependsOn ['environment/InstancedFoliage', 'environment/vegetationData', 'config/palette']
+ * @exports [Flowers, Flowers]
+ * @aiEdit
+ *   - 改本文件导出的 Flowers、Flowers 即可；依赖见 @dependsOn
+ */
+/**
  * 花朵（InstancedMesh）
  * 小花球（茎被草丛遮盖），多色变化（白/黄/粉/淡紫），顶端轻摇。
  */

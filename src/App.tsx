@@ -1,4 +1,13 @@
 /**
+ * @module App
+ * @layer root（根层）
+ * @purpose 组合根（只装配各层组件，不含逻辑）
+ * @dependsOn ['world/Terrain', 'water/Water', 'world/River', 'world/Structures', 'world/ExhibitionBase', 'lighting/Lighting', 'lighting/SkyDome', 'camera/CameraRig', 'postprocessing/Effects', 'environment/Vegetation', 'audio/AudioUpdater', 'water/SprayParticles', 'ui/UI', 'config/constants']
+ * @exports [App, App]
+ * @aiEdit
+ *   - 改本文件导出的 App、App 即可；依赖见 @dependsOn
+ */
+/**
  * 根组件 — 版本C（融合版）
  * Canvas: frameloop="demand" + Effects 接管渲染 + three 内置 ACES
  */

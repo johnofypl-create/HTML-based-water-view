@@ -1,4 +1,13 @@
 /**
+ * @module lighting/computeLighting
+ * @layer lighting（域层）
+ * @purpose 按 timeOfDay 计算昼夜关键帧插值（写入 lightingState）
+ * @dependsOn ['config/timePresets', 'utils/math', 'state/lightingState']
+ * @exports [computeLighting]
+ * @aiEdit
+ *   - 调昼夜配色 → 配合 config/timePresets.ts 关键帧
+ */
+/**
  * 时间 → 光照参数计算
  * 在 5 个关键帧之间按 24h 环形插值，写入 lightingState 单例。
  * 颜色用线性插值，方向向量插值后归一化。

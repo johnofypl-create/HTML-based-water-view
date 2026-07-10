@@ -1,4 +1,13 @@
 /**
+ * @module utils/terrain
+ * @layer utils（叶子层）
+ * @purpose 地形高度单一事实源 heightAt + 河流路径/坡度/法线/生物群系
+ * @dependsOn ['utils/noise', 'utils/math', 'config/constants', 'config/biomeConfig']
+ * @exports [RIVER_CONTROL_POINTS, riverTangentAt, heightAt, slopeAt, normalAt, biomeAt, isUnderwater, getRiverPath, RIVER_HALF_WIDTH]
+ * @aiEdit
+ *   - 改地形形状 → 只改 heightAt（全库单一事实源，改一处全局生效）；算法改动属核心层，本次重构不动
+ */
+/**
  * 地形高度函数（纯函数）
  * 地形网格、水着色器（深度色）、植被分布共用同一 heightAt，保证一致性。
  *

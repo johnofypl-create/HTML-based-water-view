@@ -1,4 +1,13 @@
 /**
+ * @module world/ExhibitionBase
+ * @layer world（域层）
+ * @purpose 展示底座（暗色台面）
+ * @dependsOn ['config/constants']
+ * @exports [ExhibitionBase, ExhibitionBase]
+ * @aiEdit
+ *   - 改本文件导出的 ExhibitionBase、ExhibitionBase 即可；依赖见 @dependsOn
+ */
+/**
  * 展台底座
  * 深色平台在场景下方，模拟博物馆展示台的底座——强化"物理模型"感。
  * 从版本 A 移入。

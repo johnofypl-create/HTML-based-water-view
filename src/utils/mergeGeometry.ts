@@ -1,4 +1,13 @@
 /**
+ * @module utils/mergeGeometry
+ * @layer utils（叶子层）
+ * @purpose 几何合并工具
+ * @dependsOn []
+ * @exports [mergeGeometries]
+ * @aiEdit
+ *   - 改本文件导出的 mergeGeometries 即可；依赖见 @dependsOn
+ */
+/**
  * 几何合并工具
  * 手动合并多个 BufferGeometry（处理 indexed/non-indexed），避免 import 路径问题。
  */

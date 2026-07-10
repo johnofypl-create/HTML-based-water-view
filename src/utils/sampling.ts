@@ -1,4 +1,13 @@
 /**
+ * @module utils/sampling
+ * @layer utils（叶子层）
+ * @purpose 植被/岩石实例采样（按生物群系密度布点）
+ * @dependsOn ['utils/math', 'utils/noise', 'utils/terrain', 'config/biomeConfig', 'config/constants']
+ * @exports [VegetationInstance, SpeciesKey, sampleVegetation]
+ * @aiEdit
+ *   - 改本文件导出的 VegetationInstance、SpeciesKey、sampleVegetation 即可；依赖见 @dependsOn
+ */
+/**
  * 植被放置采样
  * 对地形做网格采样，按 biome 密度 + 噪声调制决定是否放置，
  * poisson 抖动避免网格感，低频噪声形成自然集群。

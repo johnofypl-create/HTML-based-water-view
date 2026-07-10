@@ -1,4 +1,13 @@
 /**
+ * @module world/Structures
+ * @layer world（域层）
+ * @purpose 人工构筑物（灯塔/房屋等）
+ * @dependsOn ['utils/mergeGeometry', 'utils/terrain', 'config/constants', 'config/palette']
+ * @exports [Structures, Structures]
+ * @aiEdit
+ *   - 改本文件导出的 Structures、Structures 即可；依赖见 @dependsOn
+ */
+/**
  * 木结构构筑物
  * 程序化几何：木板路、木桥、小码头。固定手工艺感位置。
  */

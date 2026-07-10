@@ -1,4 +1,13 @@
 /**
+ * @module water/SprayParticles
+ * @layer water（域层）
+ * @purpose 轻量 GPU 飞溅粒子层（环形缓冲 + 闭式弹道 + 三触发源）
+ * @dependsOn ['config/constants', 'water/gerstner', 'water/waterSurface', 'state/splashBus', 'water/splashTargets', 'water/sprayShader']
+ * @exports [SprayParticles, SprayParticles]
+ * @aiEdit
+ *   - 调粒子数/寿命/尺寸 → 改 config/spray.ts；调触发逻辑 → 改本文件 spawn 段（波峰/地形事件/礁石拍浪）
+ */
+/**
  * 飞溅粒子（浪花 / 水花）组件
  *
  * 固定粒子池 + 顶点着色器闭式弹道积分（「无状态」GPU 粒子）：

@@ -1,4 +1,13 @@
 /**
+ * @module environment/Clouds
+ * @layer environment（域层）
+ * @purpose 云
+ * @dependsOn ['utils/mergeGeometry', 'config/constants']
+ * @exports [Clouds, Clouds]
+ * @aiEdit
+ *   - 改本文件导出的 Clouds、Clouds 即可；依赖见 @dependsOn
+ */
+/**
  * 云朵
  * 风格化低多边形云团（多个球合并），缓慢飘移。
  * 云影：用一个大的半透明暗斑随云移动，投影到地面。

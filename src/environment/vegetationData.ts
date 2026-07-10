@@ -1,4 +1,13 @@
 /**
+ * @module environment/vegetationData
+ * @layer environment（域层）
+ * @purpose 植被实例数据（草/花/灌木/树/漂流木布点）
+ * @dependsOn ['utils/sampling', 'config/constants']
+ * @exports [getVegetation]
+ * @aiEdit
+ *   - 改本文件导出的 getVegetation 即可；依赖见 @dependsOn
+ */
+/**
  * 植被实例数据生成（缓存）
  * 用 sampling.ts 为各物种生成实例数组。地形/水/植被共用 heightAt 保证一致。
  */

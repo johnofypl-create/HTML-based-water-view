@@ -1,4 +1,13 @@
 /**
+ * @module config/palette
+ * @layer config（叶子层）
+ * @purpose 全局调色板与水深配色采样
+ * @dependsOn []
+ * @exports [PALETTE, sampleWaterColor]
+ * @aiEdit
+ *   - 改本文件导出的 PALETTE、sampleWaterColor 即可；依赖见 @dependsOn
+ */
+/**
  * 自然调色板
  * 克制、柔和、暖调偏自然。所有颜色为线性 sRGB（hex 三位数→Vector3）。
  * 避免 AAAA 级饱和；追求景观建筑师的手工感。

@@ -1,4 +1,13 @@
 /**
+ * @module environment/Bushes
+ * @layer environment（域层）
+ * @purpose 灌木实例层
+ * @dependsOn ['environment/InstancedFoliage', 'environment/vegetationData', 'config/palette']
+ * @exports [Bushes, Bushes]
+ * @aiEdit
+ *   - 改本文件导出的 Bushes、Bushes 即可；依赖见 @dependsOn
+ */
+/**
  * 灌木（InstancedMesh）
  * 低多边形球状，压扁，深绿多色。轻摆。
  */

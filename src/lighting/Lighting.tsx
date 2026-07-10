@@ -1,4 +1,13 @@
 /**
+ * @module lighting/Lighting
+ * @layer lighting（域层）
+ * @purpose 场景灯光组件（方向光/环境光/阴影）
+ * @dependsOn ['lighting/computeLighting', 'state/lightingState', 'state/useGameStore', 'config/constants']
+ * @exports [Lighting, Lighting]
+ * @aiEdit
+ *   - 改本文件导出的 Lighting、Lighting 即可；依赖见 @dependsOn
+ */
+/**
  * 光照总控
  *  - directionalLight（太阳/月亮，投射阴影）
  *  - ambientLight + hemisphereLight（环境填充）

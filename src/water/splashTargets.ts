@@ -1,3 +1,12 @@
+/**
+ * @module water/splashTargets
+ * @layer water（域层）
+ * @purpose 溅水目标注册表（礁石/岛屿登记，供拍浪判定）
+ * @dependsOn []
+ * @exports [SplashTarget, registerSplashTarget, getSplashTargets, tickSplashTargetCooldowns]
+ * @aiEdit
+ *   - 新增溅水目标（礁石/岛屿）→ registerSplashTarget({pos,radius,...})
+ */
 import * as THREE from 'three'
 
 export interface SplashTarget {

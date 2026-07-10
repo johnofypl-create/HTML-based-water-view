@@ -1,4 +1,13 @@
 /**
+ * @module environment/MarineElements
+ * @layer environment（域层）
+ * @purpose 海洋元素（珊瑚/水下植物/岛屿/礁石标记 + 溅水目标注册）
+ * @dependsOn ['utils/terrain', 'config/constants', 'water/splashTargets']
+ * @exports [MarineElements, MarineElements]
+ * @aiEdit
+ *   - 改本文件导出的 MarineElements、MarineElements 即可；依赖见 @dependsOn
+ */
+/**
  * 海洋生态元素（从版本 A 移入）
  *
  * 珊瑚礁：锥体暖色，浅水区散布

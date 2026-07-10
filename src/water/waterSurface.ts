@@ -1,4 +1,13 @@
 /**
+ * @module water/waterSurface
+ * @layer water（域层）
+ * @purpose 水面高度统一抽象 sampleWaterSurface（未来接高度场灌水只改此处）
+ * @dependsOn ['config/constants', 'water/gerstner']
+ * @exports [WaterSurfaceSample, sampleWaterSurface]
+ * @aiEdit
+ *   - 接入高度场灌水 → 改 sampleWaterSurface 的 surfaceY = T + h（未来 P1）
+ */
+/**
  * 水面高度统一抽象层。
  *
  * 所有「某个世界坐标处的水面在哪」查询都走这里：

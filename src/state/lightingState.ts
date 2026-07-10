@@ -1,4 +1,13 @@
 /**
+ * @module state/lightingState
+ * @layer state（状态层）
+ * @purpose 可变单例场景光状态（天空/太阳/雾/海色），跨层共享，非响应式
+ * @dependsOn []
+ * @exports [LightingState, lightingState]
+ * @aiEdit
+ *   - 改本文件导出的 LightingState、lightingState 即可；依赖见 @dependsOn
+ */
+/**
  * 光照状态单例（非响应式）
  * Lighting 组件用 useFrame 写入（从 timeOfDay 插值），
  * Terrain/Water/Sky 等用 useFrame 读取，避免 zustand 触发重渲染。

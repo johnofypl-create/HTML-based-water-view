@@ -1,4 +1,13 @@
 /**
+ * @module world/Terrain
+ * @layer world（域层）
+ * @purpose 地形组件（装配几何 + 材质 + 昼夜响应）
+ * @dependsOn ['world/terrainGeometry', 'world/terrainMaterial', 'state/lightingState']
+ * @exports [Terrain, Terrain]
+ * @aiEdit
+ *   - 改本文件导出的 Terrain、Terrain 即可；依赖见 @dependsOn
+ */
+/**
  * 地形组件
  * 组装几何 + 材质，挂为 mesh，接收与投射阴影。
  * 每帧更新材质 uniform（uTime + 从 lightingState 读 sun/fog）。

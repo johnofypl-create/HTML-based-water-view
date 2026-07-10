@@ -1,4 +1,13 @@
 /**
+ * @module utils/glslChunks
+ * @layer utils（叶子层）
+ * @purpose 可复用 GLSL 片段（哈希/缓动/雾/voronoi/fbm）
+ * @dependsOn []
+ * @exports [GLSL_HASH, GLSL_EASING, GLSL_FOG, GLSL_VORONOI]
+ * @aiEdit
+ *   - 改本文件导出的 GLSL_HASH、GLSL_EASING、GLSL_FOG、GLSL_VORONOI 即可；依赖见 @dependsOn
+ */
+/**
  * 共享 GLSL 片段（字符串导出，便于在着色器中拼接复用）
  * 哈希噪声、值噪声、雾、缓动等。
  * 注意：这些是 GLSL 源码字符串，不是 TS。

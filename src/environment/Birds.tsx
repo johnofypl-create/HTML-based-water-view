@@ -1,4 +1,13 @@
 /**
+ * @module environment/Birds
+ * @layer environment（域层）
+ * @purpose 飞鸟
+ * @dependsOn ['config/constants']
+ * @exports [Birds, Birds]
+ * @aiEdit
+ *   - 改本文件导出的 Birds、Birds 即可；依赖见 @dependsOn
+ */
+/**
  * 飞鸟
  * 几只鸟沿大圆路径飞行，翅膀扇动。简单 V 形几何。
  */

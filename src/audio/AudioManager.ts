@@ -1,4 +1,13 @@
 /**
+ * @module audio/AudioManager
+ * @layer audio（域层）
+ * @purpose 程序化环境音管理（浪/风/河/鸟/虫）
+ * @dependsOn ['audio/noiseBuffer']
+ * @exports [audioManager]
+ * @aiEdit
+ *   - 改本文件导出的 audioManager 即可；依赖见 @dependsOn
+ */
+/**
  * 音频管理器（单例）
  * 全 Web Audio 程序化合成环境音：海浪/风/河/鸟鸣/虫鸣。
  * 用户手势（StartOverlay）触发 start()，每帧 update(timeOfDay) 调各层增益。

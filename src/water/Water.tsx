@@ -1,4 +1,13 @@
 /**
+ * @module water/Water
+ * @layer water（域层）
+ * @purpose 水面组件（装配 Plane + 波位移 + 泡沫材质）
+ * @dependsOn ['water/waterMaterial', 'config/constants']
+ * @exports [Water, Water]
+ * @aiEdit
+ *   - 改本文件导出的 Water、Water 即可；依赖见 @dependsOn
+ */
+/**
  * 海洋水面组件
  * 大水平面（略大于世界），挂水着色器材质。
  * 每帧更新 uniform（时间 + 相机位置）。

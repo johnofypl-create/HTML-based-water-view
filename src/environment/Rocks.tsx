@@ -1,4 +1,13 @@
 /**
+ * @module environment/Rocks
+ * @layer environment（域层）
+ * @purpose 岩石实例层（+ 溅水目标注册）
+ * @dependsOn ['utils/sampling', 'config/constants', 'water/splashTargets']
+ * @exports [Rocks, Rocks]
+ * @aiEdit
+ *   - 改本文件导出的 Rocks、Rocks 即可；依赖见 @dependsOn
+ */
+/**
  * 岩石（InstancedMesh）
  * 低多边形 IcosahedronGeometry + flatShading，暖灰标准材质。
  * 用 sampling 采样放置（含浅水区）。阶段2 会并入完整 Vegetation 总管。

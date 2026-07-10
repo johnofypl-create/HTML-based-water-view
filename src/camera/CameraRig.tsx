@@ -1,4 +1,13 @@
 /**
+ * @module camera/CameraRig
+ * @layer camera（域层）
+ * @purpose 相机绑定（轨道控制 + 空闲自转 + 重置）
+ * @dependsOn ['config/constants', 'state/useGameStore']
+ * @exports [CameraRig, CameraRig]
+ * @aiEdit
+ *   - 改本文件导出的 CameraRig、CameraRig 即可；依赖见 @dependsOn
+ */
+/**
  * 相机系统
  * OrbitControls 封装：阻尼平滑、约束、重置 + 空闲自动缓移
  *

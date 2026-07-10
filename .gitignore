@@ -26,3 +26,11 @@ npm-debug.log*
 
 # Vite cache
 .vite/
+
+# WorkBuddy internal data (do NOT commit)
+.workbuddy/
+
+# TypeScript / Vite generated artifacts
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts

@@ -1,5 +1,5 @@
 /**
- * @module water/shallowWater
+ * @module water/physics/shallowWater
  * @layer water（域层）
  * @purpose 高度场浅水 Virtual Pipes 参考求解器（CPU，物理水 P0）
  * @dependsOn []
@@ -13,7 +13,7 @@
  * 用途：P0 原型 —— 验证"动态地形 → 水实时流入洼地"在数值上能收敛。
  * 后续：
  *   P1 把它移植到 GPUComputationRenderer（WebGL2 ping-pong，O(G²) 上 GPU），
- *   P3 接入 src/water/waterSurface.ts 统一水面高度抽象（地形取自
+ *   P3 接入 src/water/surface/waterSurface.ts 统一水面高度抽象（地形取自
  *       getHeightFieldTexture()/heightAt，水面高度 S = T + h）。
  *
  * 模型（每格只存一个水深标量 h，地形是另一张高度场 T）：

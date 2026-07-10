@@ -37,7 +37,7 @@ src/
 | `utils/terrain.ts`（`heightAt` 单一事实源） | terrainGeometry / sampling / Structures / MarineElements / heightField / biomeConfig / Vegetation 等 9+ 处 | ✅ **好模式**，全库共用同一高度函数，需保留并在别处复制 |
 | `state/lightingState.ts`（场景状态单例） | computeLighting / Lighting / SkyDome / Terrain / River / waterMaterial / InstancedFoliage / Effects（跨 5 层 8 文件） | ✅ 集中式场景状态中枢，合理；但 waterMaterial 用了一层多余 wrapper |
 | `state/useGameStore.ts`（zustand：timeOfDay/uiVisible/cameraReset） | Lighting / AudioUpdater / CameraRig / UI | ✅ 非孤儿，是 UI/时间中枢 |
-| `state/splashBus.ts` + `water/splashTargets.ts`（事件总线 + 注册表） | SprayParticles / Rocks / MarineElements | ✅ 解耦范本，保留 |
+| `state/splashBus.ts` + `water/state/splashTargets.ts`（事件总线 + 注册表） | SprayParticles / Rocks / MarineElements | ✅ 解耦范本，保留 |
 | `animation/vertexShaders.ts`（`makeSwayMaterial` 等风摆材质工厂） | environment/InstancedFoliage | ✅ 非孤儿 |
 | `config/constants.ts` | App / 几乎全库 | ⚠️ **上帝对象**：混入世界尺寸 / 相机 / 性能计数 / 浪花参数 / 时间，~100 行 |
 
@@ -77,7 +77,7 @@ src/
 
 - **R1 叶子不可反向依赖**：`utils/`、`config/` 不得 import 任何 `src/` 内部模块（只可 import 第三方）。
 - **R2 禁止循环依赖**：A 若需 B 的数据，B 必须通过 `state/` 或本层 **barrel** 暴露，A 不得 `import` B 的某个内部文件。
-- **R3 域间通信走 state/ 或 barrel**：如 `environment` 需要浪花目标，只 `import { registerSplashTarget } from '../water'`（barrel）或 `from '../water/splashTargets'`，不得抓 `SprayParticles` 内部。
+- **R3 域间通信走 state/ 或 barrel**：如 `environment` 需要浪花目标，只 `import { registerSplashTarget } from '../water'`（barrel）或 `from '../water/state/splashTargets'`，不得抓 `SprayParticles` 内部。
 - **R4 组合根唯一**：只有 `App.tsx` 能直接 new 组件树；域组件之间不直接互相实例化。
 
 ### 1.3 命名规范（强制）
@@ -144,10 +144,10 @@ src/
 - **统一模块头模板**（每个文件顶部）：
   ```ts
   /**
-   * @module water/waterMaterial
+   * @module water/foam/waterMaterial
    * @layer water（域层）
    * @purpose 海面着色器材质工厂：Gerstner 波位移 + Jacobian 白帽泡沫 + 岸线湿边 + 与水/雾/天空状态同步
-   * @dependsOn ['state/lightingState', 'water/heightField', 'utils/glslChunks']
+   * @dependsOn ['state/lightingState', 'water/surface/heightField', 'utils/glslChunks']
    * @exports [createWaterMaterial, updateWaterMaterial]
    * @aiEdit
    *   - 调泡沫密度/颜色 → 改 fragment 的 `applyFoam()` 与 uniforms uFoam*

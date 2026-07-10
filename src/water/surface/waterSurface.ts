@@ -1,8 +1,8 @@
 /**
- * @module water/waterSurface
+ * @module water/surface/waterSurface
  * @layer water（域层）
  * @purpose 水面高度统一抽象 sampleWaterSurface（未来接高度场灌水只改此处）
- * @dependsOn ['config/constants', 'water/gerstner']
+ * @dependsOn ['config/constants', 'water/surface/gerstner']
  * @exports [WaterSurfaceSample, sampleWaterSurface]
  * @aiEdit
  *   - 接入高度场灌水 → 改 sampleWaterSurface 的 surfaceY = T + h（未来 P1）
@@ -26,7 +26,7 @@
  * 那时地形 T 取自 getHeightFieldTexture()/heightAt，水深 h 由 GPU 求解器产出，
  * 本文件的 sampleWaterSurface 改为 surfaceY = T + h 即可，发射源/泡沫零改动。
  */
-import { WATER_LEVEL } from '../config/constants'
+import { WATER_LEVEL } from '../../config/constants'
 import { sampleGerstner } from './gerstner'
 
 export interface WaterSurfaceSample {

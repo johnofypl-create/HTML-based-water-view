@@ -1,5 +1,5 @@
 /**
- * @module water/splashTargets
+ * @module water/state/splashTargets
  * @layer water（域层）
  * @purpose 溅水目标注册表（礁石/岛屿登记，供拍浪判定）
  * @dependsOn []

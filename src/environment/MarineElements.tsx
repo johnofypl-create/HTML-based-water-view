@@ -2,7 +2,7 @@
  * @module environment/MarineElements
  * @layer environment（域层）
  * @purpose 海洋元素（珊瑚/水下植物/岛屿/礁石标记 + 溅水目标注册）
- * @dependsOn ['utils/terrain', 'config/constants', 'water/splashTargets']
+ * @dependsOn ['utils/terrain', 'config/constants', 'water/state/splashTargets']
  * @exports [MarineElements, MarineElements]
  * @aiEdit
  *   - 改本文件导出的 MarineElements、MarineElements 即可；依赖见 @dependsOn
@@ -19,7 +19,7 @@ import { useMemo, useRef, useLayoutEffect } from 'react'
 import * as THREE from 'three'
 import { heightAt } from '../utils/terrain'
 import { WATER_LEVEL, WORLD_SIZE } from '../config/constants'
-import { registerSplashTarget } from '../water/splashTargets'
+import { registerSplashTarget } from '../water/state/splashTargets'
 
 // ── 确定性种子随机 ──
 function srand(seed: number): number {

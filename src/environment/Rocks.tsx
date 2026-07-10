@@ -2,7 +2,7 @@
  * @module environment/Rocks
  * @layer environment（域层）
  * @purpose 岩石实例层（+ 溅水目标注册）
- * @dependsOn ['utils/sampling', 'config/constants', 'water/splashTargets']
+ * @dependsOn ['utils/sampling', 'config/constants', 'water/state/splashTargets']
  * @exports [Rocks, Rocks]
  * @aiEdit
  *   - 改本文件导出的 Rocks、Rocks 即可；依赖见 @dependsOn
@@ -16,7 +16,7 @@ import { useMemo, useRef, useLayoutEffect } from 'react'
 import * as THREE from 'three'
 import { sampleVegetation } from '../utils/sampling'
 import { PERF, SEED } from '../config/constants'
-import { registerSplashTarget } from '../water/splashTargets'
+import { registerSplashTarget } from '../water/state/splashTargets'
 
 export default function Rocks() {
   const meshRef = useRef<THREE.InstancedMesh>(null)

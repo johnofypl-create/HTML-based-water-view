@@ -2,7 +2,7 @@
  * @module water/Water
  * @layer water（域层）
  * @purpose 水面组件（装配 Plane + 波位移 + 泡沫材质）
- * @dependsOn ['water/waterMaterial', 'config/constants']
+ * @dependsOn ['water/foam/waterMaterial', 'config/constants']
  * @exports [Water, Water]
  * @aiEdit
  *   - 改本文件导出的 Water、Water 即可；依赖见 @dependsOn
@@ -15,7 +15,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { createWaterMaterial, updateWaterMaterial, WaterMaterial } from './waterMaterial'
+import { createWaterMaterial, updateWaterMaterial, WaterMaterial } from './foam/waterMaterial'
 import { WORLD_SIZE, WATER_LEVEL } from '../config/constants'
 
 export default function Water() {

@@ -1,8 +1,8 @@
 /**
- * @module water/SprayParticles
+ * @module water/foam/SprayParticles
  * @layer water（域层）
  * @purpose 轻量 GPU 飞溅粒子层（环形缓冲 + 闭式弹道 + 三触发源）
- * @dependsOn ['config/constants', 'water/gerstner', 'water/waterSurface', 'state/splashBus', 'water/splashTargets', 'water/sprayShader']
+ * @dependsOn ['config/constants', 'water/surface/gerstner', 'water/surface/waterSurface', 'state/splashBus', 'water/state/splashTargets', 'water/foam/sprayShader']
  * @exports [SprayParticles, SprayParticles]
  * @aiEdit
  *   - 调粒子数/寿命/尺寸 → 改 config/spray.ts；调触发逻辑 → 改本文件 spawn 段（波峰/地形事件/礁石拍浪）
@@ -26,11 +26,11 @@
 import { useMemo, useRef, useLayoutEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { SPRAY, WATER_LEVEL } from '../config/constants'
-import { sampleGerstner, primaryWindDir } from './gerstner'
-import { sampleWaterSurface } from './waterSurface'
-import { splashBus } from '../state/splashBus'
-import { getSplashTargets, tickSplashTargetCooldowns } from './splashTargets'
+import { SPRAY, WATER_LEVEL } from '../../config/constants'
+import { sampleGerstner, primaryWindDir } from '../surface/gerstner'
+import { sampleWaterSurface } from '../surface/waterSurface'
+import { splashBus } from '../../state/splashBus'
+import { getSplashTargets, tickSplashTargetCooldowns } from '../state/splashTargets'
 import { sprayVertexShader, sprayFragmentShader } from './sprayShader'
 
 const N = SPRAY.count

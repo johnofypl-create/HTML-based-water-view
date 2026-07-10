@@ -1,5 +1,5 @@
 /**
- * @module water/heightField
+ * @module water/surface/heightField
  * @layer water（域层）
  * @purpose 地形高度场 DataTexture 生成与 UV 映射（物理水/着色器采样用）
  * @dependsOn ['utils/terrain', 'config/constants']
@@ -13,8 +13,8 @@
  * 世界坐标 (x, z) ↔ UV 通过 uWorldSize/uTexSize 统一映射。
  */
 import * as THREE from 'three'
-import { heightAt } from '../utils/terrain'
-import { WORLD_SIZE, HEIGHT_TEX_SIZE } from '../config/constants'
+import { heightAt } from '../../utils/terrain'
+import { WORLD_SIZE, HEIGHT_TEX_SIZE } from '../../config/constants'
 
 let cachedTexture: THREE.DataTexture | null = null
 

@@ -1,5 +1,5 @@
 /**
- * @module water/gerstner
+ * @module water/surface/gerstner
  * @layer water（域层）
  * @purpose Gerstner 波单一事实源（TS 端采样，供 CPU 发射器/物理用）
  * @dependsOn []

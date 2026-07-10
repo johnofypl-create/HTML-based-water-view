@@ -4,7 +4,7 @@
  * @purpose 飞溅粒子（浪花 / 水花）参数：池大小、重力、寿命、发射节流、触发阈值
  * @dependsOn []
  * @exports [SPRAY]
- * @aiEdit 调粒子数 / 尺寸 / 寿命 / 触发密度 → 改 SPRAY（消费方见 water/SprayParticles.tsx）
+ * @aiEdit 调粒子数 / 尺寸 / 寿命 / 触发密度 → 改 SPRAY（消费方见 water/foam/SprayParticles.tsx）
  */
 export const SPRAY = {
   /** 粒子池上限（环形缓冲） */

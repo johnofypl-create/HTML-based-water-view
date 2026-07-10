@@ -1,5 +1,5 @@
 /**
- * @module water/sprayShader
+ * @module water/foam/sprayShader
  * @layer water（域层）
  * @purpose 飞溅粒子顶点/片段着色器（弹道积分 + 软圆点）
  * @dependsOn []

@@ -30,7 +30,7 @@
 
 - **R1 叶子不可反向依赖**：`utils/`、`config/` 不得 import 任何 `src/` 内部模块（只可 import 第三方）。
 - **R2 禁止循环依赖**：A 若需 B 的数据，B 必须通过 `state/` 或本层 **barrel** 暴露，A 不得 `import` B 的某个内部文件。
-- **R3 域间通信走 state/ 或 barrel**：如 `environment` 需要浪花目标，只 `import { registerSplashTarget } from '../water'`（barrel）或 `from '../water/splashTargets'`，不得抓 `SprayParticles` 内部。
+- **R3 域间通信走 state/ 或 barrel**：如 `environment` 需要浪花目标，只 `import { registerSplashTarget } from '../water'`（barrel）或 `from '../water/state/splashTargets'`，不得抓 `SprayParticles` 内部。
 - **R4 组合根唯一**：只有 `App.tsx` 能直接 new 组件树；域组件之间不直接互相实例化。
 
 ---
@@ -55,6 +55,7 @@
 - 每个域文件夹含 `index.ts` 作为公开 API 清单（AI 看 `index.ts` 即知可改 / 可 import 什么）。
 - `config/` 以 `constants.ts` 为 barrel，按域拆 `world/camera/perf/spray/time.ts`；下游 `import ... from '../config/constants'` **路径不变**。
 - barrel 只暴露各文件的**公开导出**（即其 `export` 表面），不重新导出文件内部未导出的私有成员。
+- `water/` 进一步按职责子分组（P7）：`surface/`（高度场/波/水面抽象）、`foam/`（材质/着色器/粒子/组件）、`physics/`（浅水求解器）、`state/`（溅水目标）；`Water.tsx` 留在 `water/` 根作域主组件。域外只经 `water/index.ts` barrel 取数，不直接抓子目录内部文件。
 
 ---
 
@@ -75,16 +76,16 @@
 | 想改什么 | 改哪个文件 | 改哪一段 / 注意 |
 |---|---|---|
 | 浪花粒子数 / 寿命 / 尺寸 | `config/spray.ts`（`SPRAY`） | 唯一定义处，下游经 barrel 引用 |
-| 波形 / 风向 | `water/gerstner.ts` + `water/gerstner.glsl.ts` | 两文件**同源**（同一波参数数组），改一处两处一致 |
-| 泡沫密度 / 颜色 | `water/waterMaterial.ts` | 片段 `applyFoam` 与 `uFoam*` uniform |
+| 波形 / 风向 | `water/surface/gerstner.ts` + `water/surface/gerstner.glsl.ts` | 两文件**同源**（同一波参数数组），改一处两处一致 |
+| 泡沫密度 / 颜色 | `water/foam/waterMaterial.ts` | 片段 `applyFoam` 与 `uFoam*` uniform |
 | 水体 / 天空昼夜配色 | `config/timePresets.ts` 关键帧 + `lighting/computeLighting.ts` | 关键帧插值写入 `lightingState` |
 | 地形形状 | `utils/terrain.ts` 的 `heightAt` | **全库单一事实源**，改一处全局生效 |
 | 植被 / 岩石布点 | `utils/sampling.ts` + `environment/vegetationData.ts` | 按生物群系密度 |
 | 相机约束（距离 / 角度 / 阻尼） | `config/camera.ts`（`CAMERA`） | — |
 | 性能档位（实例数 / 阴影 / 像素比） | `config/perf.ts`（`PERF`） | 实例数↑画质↑但更慢 |
-| 接入高度场灌水（物理水 P1） | `water/waterSurface.ts` 的 `sampleWaterSurface` | 改 `surfaceY = T + h`；求解器见 `water/shallowWater.ts` |
+| 接入高度场灌水（物理水 P1） | `water/surface/waterSurface.ts` 的 `sampleWaterSurface` | 改 `surfaceY = T + h`；求解器见 `water/physics/shallowWater.ts` |
 | 触发地形改造溅水 | `state/splashBus.ts` | `splashBus.emit({pos,intensity})`，无需改 `SprayParticles` |
-| 新增溅水目标（礁石 / 岛屿） | `water/splashTargets.ts` | `registerSplashTarget({pos,radius,...})` |
+| 新增溅水目标（礁石 / 岛屿） | `water/state/splashTargets.ts` | `registerSplashTarget({pos,radius,...})` |
 | 后处理（Bloom / DoF / SMAA） | `postprocessing/Effects.tsx` | `frameloop="demand"` 下每帧 `invalidate()` 常驻 |
 
 ---

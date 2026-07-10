@@ -14,7 +14,7 @@ import {
   maxSurfaceSlope,
   pour,
   type ShallowState,
-} from '../src/water/shallowWater.ts'
+} from '../src/water/physics/shallowWater.ts'
 
 const G = 64
 // 显式稳定需要 K*dt ≪ 0.25（4 邻居），0.2 稳妥

@@ -42,7 +42,7 @@ export default function SkyDome() {
           if (h > 0.0) {
             col = mix(uHorizon, uTop, smoothstep(0.0, 0.55, h));
           } else {
-            col = mix(uHorizon, uBottom, smoothstep(0.0, -0.4, h));
+            col = mix(uHorizon, uBottom, (1.0 - smoothstep(-0.4, 0.0, h)));
           }
           gl_FragColor = vec4(col, 1.0);
         }

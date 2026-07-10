@@ -10,6 +10,12 @@
  * 未来接「高度场灌水」（见 docs/physics-water-research.md 的 P 系列）时，
  * 只需把 sampleWaterSurface 改为读取水深场纹理 h：surfaceY = T(x,z)+h(x,z)。
  * 三种发射源与泡沫深度全部自动平滑衔接，无需改其它文件。
+ *
+ * 参考求解器已就绪：./shallowWater.ts（Virtual Pipes CPU 参考实现 + 数值收敛验证，
+ * 跑 scripts/verify-shallow-water.ts 可复现收敛证据）。
+ * P1 会把它移植到 GPUComputationRenderer（WebGL2 ping-pong）做实时灌水；
+ * 那时地形 T 取自 getHeightFieldTexture()/heightAt，水深 h 由 GPU 求解器产出，
+ * 本文件的 sampleWaterSurface 改为 surfaceY = T + h 即可，发射源/泡沫零改动。
  */
 import { WATER_LEVEL } from '../config/constants'
 import { sampleGerstner } from './gerstner'

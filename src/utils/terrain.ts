@@ -117,7 +117,7 @@ export function heightAt(x: number, z: number): number {
 
   // 4. 海岸塑形：在海平面附近压平形成沙滩
   //    beach 权重在 h≈0.3 附近最大，向两侧衰减
-  const beachBand = smoothstep(-0.6, 0.5, h) * smoothstep(2.2, 0.5, h)
+  const beachBand = smoothstep(-0.6, 0.5, h) * (1.0 - smoothstep(0.5, 2.2, h))
   h = h * (1 - beachBand * 0.65) + 0.32 * (beachBand * 0.65)
 
   // 5. 悬崖：东南角用 ridge 噪声抬升形成陡岸

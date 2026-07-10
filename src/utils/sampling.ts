@@ -80,7 +80,7 @@ export function sampleVegetation(
     if (species === 'grass' && biome === Biome.Forest) density *= 0.5
     if (species === 'tree' && biome === Biome.Grass) density *= 0.25
     // 沙滩漂流木集中在水线
-    if (species === 'driftwood') density *= smoothstep(0.0, 0.5, h) * smoothstep(1.5, 0.3, h)
+    if (species === 'driftwood') density *= smoothstep(0.0, 0.5, h) * (1.0 - smoothstep(0.3, 1.5, h))
 
     if (rng() > density) continue
 

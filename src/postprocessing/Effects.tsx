@@ -38,6 +38,7 @@ export default function Effects() {
 
   useEffect(() => {
     const comp = new EffectComposer(gl)
+    comp.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
 
     const renderPass = new RenderPass(scene, camera)
     renderPass.clearAlpha = 1

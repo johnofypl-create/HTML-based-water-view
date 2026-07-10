@@ -58,7 +58,7 @@ export const lightingState: LightingState = {
   hemiSky: new THREE.Color('#bcd4e6'),
   hemiGround: new THREE.Color('#7a6a52'),
   fogColor: new THREE.Color('#d4e2ea'),
-  fogDensity: 0.011,
+  fogDensity: 0.006,
   skyTop: new THREE.Color('#5a7a9a'),
   skyBottom: new THREE.Color('#e8d8c0'),
   bloomIntensity: 0.45,

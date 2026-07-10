@@ -39,8 +39,19 @@ export default function Water() {
     const m = matRef.current
     if (!m.uniforms) return
     // 推进物理水模拟并把当前水深纹理交给材质（顶点位移 / 干地遮罩 / 深度色）
-    waterField.compute(delta)
-    m.uniforms.uWaterHeight.value = waterField.getHTexture()
+    try {
+      waterField.compute(delta)
+      m.uniforms.uWaterHeight.value = waterField.getHTexture()
+      // 首次成功 compute 后启用物理模式（着色器才采样 uWaterHeight + 干地遮罩）
+      if (!m.uniforms.uEnablePhysics.value) {
+        m.uniforms.uEnablePhysics.value = true
+      }
+    } catch (e) {
+      // GCR 未就绪或 WebGL2 不支持时退回 fallback（原始平面水面，不 discard）
+      if (m.uniforms.uEnablePhysics.value) {
+        m.uniforms.uEnablePhysics.value = false
+      }
+    }
     m.uniforms.uTime.value += delta
     updateWaterMaterial(m, m.uniforms.uTime.value, camera.position)
   })

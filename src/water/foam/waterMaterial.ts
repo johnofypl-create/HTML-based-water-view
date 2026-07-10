@@ -18,7 +18,7 @@
  */
 import * as THREE from 'three'
 import { GLSL_HASH } from '../../utils/glslChunks'
-import { WATER_LEVEL, WORLD_SIZE } from '../../config/constants'
+import { WATER_LEVEL, WORLD_SIZE, WATER_SIM_SIZE, SEA_LEVEL } from '../../config/constants'
 import { getHeightFieldTexture } from '../surface/heightField'
 import { GERSTNER_GLSL } from '../surface/gerstner.glsl'
 import { lightingState } from '../../state/lightingState'
@@ -31,6 +31,7 @@ export interface WaterMaterial extends THREE.ShaderMaterial {
     uSunColor: { value: THREE.Color }
     uHeightTex: { value: THREE.DataTexture | null }
     uWaterHeight: { value: THREE.Texture | null }
+    uEnablePhysics: { value: boolean }
     uWorldSize: { value: number }
     uWaterLevel: { value: number }
     uShallowCol: { value: THREE.Color }
@@ -56,6 +57,7 @@ const vertexShader = /* glsl */ `
   uniform float uWorldSize;
   uniform sampler2D uHeightTex;
   uniform sampler2D uWaterHeight;
+  uniform bool uEnablePhysics;       // GPU 物理水是否就绪（GCR 首次 compute 后置 true）
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   varying float vWaveHeight;
@@ -71,9 +73,16 @@ const vertexShader = /* glsl */ `
     // position 在 XZ 平面（PlaneGeometry 旋转后），y=0
     vec2 uv = (pos.xz / uWorldSize) + 0.5;
     float terrainH = texture2D(uHeightTex, uv).r;
-    float h = texture2D(uWaterHeight, uv).r;   // GPU 物理水深
-    // 物理基面 = 地形 + 水深（海/淹没区 = 海平面；干地 h≈0 由片元遮罩丢弃）
-    pos.y = (terrainH + h) - uWaterLevel;
+    float h = 10.0;            // fallback 假深水（物理未就绪时片元不触发 discard）
+
+    if (uEnablePhysics) {
+      // P1 物理模式：基面 = 地形 + 水深（海区=海平面，淹没区随水位）
+      h = texture2D(uWaterHeight, uv).r;
+      pos.y = (terrainH + h) - uWaterLevel;
+    } else {
+      // fallback：原始平面行为（无物理数据时保持全水面可见）
+      pos.y = 0.0;
+    }
 
     vec3 n;
     float jac;
@@ -99,6 +108,7 @@ const fragmentShader = /* glsl */ `
   uniform vec3 uSunDir;
   uniform vec3 uSunColor;
   uniform sampler2D uHeightTex;
+  uniform bool uEnablePhysics;       // 与顶点同步：物理模式才遮罩干地
   uniform float uWorldSize;
   uniform float uWaterLevel;
   uniform vec3 uShallowCol;
@@ -134,9 +144,9 @@ const fragmentShader = /* glsl */ `
   void main() {
     // 世界坐标 → 高度纹理 UV
     vec2 uv = (vWorldPos.xz / uWorldSize) + 0.5;
-    float h = vDepth;                       // GPU 物理水深
-    // 干地遮罩：h≈0（无水体）处丢弃 / 渐隐，海与淹没区保留
-    float waterMask = smoothstep(0.0, 0.05, h);
+    float h = vDepth;                       // GPU 物理水深（fallback=10.0）
+    // 干地遮罩：仅在物理模式下，h≈0（无水体）处丢弃/渐隐
+    float waterMask = uEnablePhysics ? smoothstep(0.0, 0.05, h) : 1.0;
     if (waterMask < 0.001) discard;
     float terrainH = texture2D(uHeightTex, uv).r;
     float depth = max(h, 0.0);          // 水柱深 ≈ h（满淹时 = 海平面 - 地形）
@@ -212,6 +222,7 @@ export function createWaterMaterial(): WaterMaterial {
     uSunColor: { value: new THREE.Color('#ffe9c4') },
     uHeightTex: { value: getHeightFieldTexture() },
     uWaterHeight: { value: null },
+    uEnablePhysics: { value: false },
     uWorldSize: { value: WORLD_SIZE },
     uWaterLevel: { value: WATER_LEVEL },
     uShallowCol: { value: new THREE.Color('#56d6c8') },
@@ -219,7 +230,7 @@ export function createWaterMaterial(): WaterMaterial {
     uDeepCol: { value: new THREE.Color('#15688f') },
     uFoamCol: { value: new THREE.Color('#f4f0e6') },
     uFogColor: { value: new THREE.Color('#d4e2ea') },
-    uFogDensity: { value: 0.011 },
+    uFogDensity: { value: 0.006 },
     uSkyColor: { value: new THREE.Color('#bcd4e6') },
     // 泡沫升级默认参数（可调）
     uFoamScale: { value: 1.6 },

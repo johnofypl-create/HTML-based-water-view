@@ -2,7 +2,7 @@
  * @module App
  * @layer root（根层）
  * @purpose 组合根（只装配各层组件，不含逻辑）
- * @dependsOn ['world/Terrain', 'water/Water', 'world/River', 'world/Structures', 'world/ExhibitionBase', 'lighting/Lighting', 'lighting/SkyDome', 'camera/CameraRig', 'postprocessing/Effects', 'environment/Vegetation', 'audio/AudioUpdater', 'water/foam/SprayParticles', 'ui/UI', 'config/constants']
+ * @dependsOn ['world/Terrain', 'water/Water', 'world/Structures', 'world/ExhibitionBase', 'lighting/Lighting', 'lighting/SkyDome', 'camera/CameraRig', 'postprocessing/Effects', 'environment/Vegetation', 'audio/AudioUpdater', 'water/foam/SprayParticles', 'ui/UI', 'config/constants']
  * @exports [App, App]
  * @aiEdit
  *   - 改本文件导出的 App、App 即可；依赖见 @dependsOn
@@ -16,7 +16,6 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import Terrain from './world/Terrain'
 import Water from './water/Water'
-import River from './world/River'
 import Structures from './world/Structures'
 import ExhibitionBase from './world/ExhibitionBase'
 import Lighting from './lighting/Lighting'
@@ -37,7 +36,6 @@ function Scene() {
       <Terrain />
       <Water />
       <SprayParticles />
-      <River />
       <Structures />
       <ExhibitionBase />
       <Vegetation />

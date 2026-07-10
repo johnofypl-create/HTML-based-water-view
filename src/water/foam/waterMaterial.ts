@@ -57,6 +57,7 @@ const vertexShader = /* glsl */ `
   uniform float uWorldSize;
   uniform sampler2D uHeightTex;
   uniform sampler2D uWaterHeight;
+  uniform float uWaterLevel;
   uniform bool uEnablePhysics;       // GPU 物理水是否就绪（GCR 首次 compute 后置 true）
   varying vec3 vWorldPos;
   varying vec3 vNormal;
@@ -230,7 +231,7 @@ export function createWaterMaterial(): WaterMaterial {
     uDeepCol: { value: new THREE.Color('#15688f') },
     uFoamCol: { value: new THREE.Color('#f4f0e6') },
     uFogColor: { value: new THREE.Color('#d4e2ea') },
-    uFogDensity: { value: 0.006 },
+    uFogDensity: { value: 0.002 },
     uSkyColor: { value: new THREE.Color('#bcd4e6') },
     // 泡沫升级默认参数（可调）
     uFoamScale: { value: 1.6 },

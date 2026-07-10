@@ -55,8 +55,8 @@ export default function Effects() {
 
     const bokeh = new BokehPass(scene, camera, {
       focus: 28,
-      aperture: 0.00035,
-      maxblur: 0.012,
+      aperture: 0.00015,
+      maxblur: 0.004,
     })
     comp.addPass(bokeh)
     bokehRef.current = bokeh

@@ -48,6 +48,7 @@ export default function Water() {
       }
     } catch (e) {
       // GCR 未就绪或 WebGL2 不支持时退回 fallback（原始平面水面，不 discard）
+      console.error('[Water] physics compute failed, fallback to flat water:', e)
       if (m.uniforms.uEnablePhysics.value) {
         m.uniforms.uEnablePhysics.value = false
       }

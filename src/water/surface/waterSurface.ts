@@ -22,9 +22,10 @@
  *
  * 参考求解器已就绪：./shallowWater.ts（Virtual Pipes CPU 参考实现 + 数值收敛验证，
  * 跑 scripts/verify-shallow-water.ts 可复现收敛证据）。
- * P1 会把它移植到 GPUComputationRenderer（WebGL2 ping-pong）做实时灌水；
- * 那时地形 T 取自 getHeightFieldTexture()/heightAt，水深 h 由 GPU 求解器产出，
- * 本文件的 sampleWaterSurface 改为 surfaceY = T + h 即可，发射源/泡沫零改动。
+ * P1 已落地：./physics/waterField.ts 把该求解器移植到 GPUComputationRenderer（WebGL2 ping-pong），
+ * 每帧产出水深纹理 h；waterMaterial 顶点按 surfaceY = T + h 位移、片元按 h 做干地遮罩与深度色。
+ * 本文件的 sampleWaterSurface 仍走 WATER_LEVEL + Gerstner（供 CPU 侧浪花发射源采样波面），
+ * 待地形编辑系统接入时可改为读取 GPU h 纹理；发射源/泡沫逻辑无需改动。
  */
 import { WATER_LEVEL } from '../../config/constants'
 import { sampleGerstner } from './gerstner'

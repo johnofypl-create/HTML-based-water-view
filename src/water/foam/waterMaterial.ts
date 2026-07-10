@@ -30,6 +30,7 @@ export interface WaterMaterial extends THREE.ShaderMaterial {
     uSunDir: { value: THREE.Vector3 }
     uSunColor: { value: THREE.Color }
     uHeightTex: { value: THREE.DataTexture | null }
+    uWaterHeight: { value: THREE.Texture | null }
     uWorldSize: { value: number }
     uWaterLevel: { value: number }
     uShallowCol: { value: THREE.Color }
@@ -53,11 +54,14 @@ export interface WaterMaterial extends THREE.ShaderMaterial {
 const vertexShader = /* glsl */ `
   uniform float uTime;
   uniform float uWorldSize;
+  uniform sampler2D uHeightTex;
+  uniform sampler2D uWaterHeight;
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   varying float vWaveHeight;
   varying float vJacobian;
   varying float vSurfaceY;
+  varying float vDepth;
 
   // 标准 Gerstner（含水平位移 + 解析法线 + 雅可比），由 gerstner.ts 生成
   ${GERSTNER_GLSL}
@@ -65,17 +69,23 @@ const vertexShader = /* glsl */ `
   void main() {
     vec3 pos = position;
     // position 在 XZ 平面（PlaneGeometry 旋转后），y=0
-    vec2 worldXZ = pos.xz;
+    vec2 uv = (pos.xz / uWorldSize) + 0.5;
+    float terrainH = texture2D(uHeightTex, uv).r;
+    float h = texture2D(uWaterHeight, uv).r;   // GPU 物理水深
+    // 物理基面 = 地形 + 水深（海/淹没区 = 海平面；干地 h≈0 由片元遮罩丢弃）
+    pos.y = (terrainH + h) - uWaterLevel;
+
     vec3 n;
     float jac;
-    vec3 disp = gerstnerSolve(worldXZ, uTime, n, jac);
+    vec3 disp = gerstnerSolve(pos.xz, uTime, n, jac);
     pos += disp;                 // 含水平位移的标准 Gerstner
     vWaveHeight = disp.y;
     vJacobian = jac;
+    vDepth = h;
 
     vec4 worldPos = modelMatrix * vec4(pos, 1.0);
     vWorldPos = worldPos.xyz;
-    vSurfaceY = worldPos.y;      // = WATER_LEVEL + 波高
+    vSurfaceY = worldPos.y;      // = 海平面 + 波高（海区）/ 淹没区基面 + 波高
     vNormal = n;
     gl_Position = projectionMatrix * viewMatrix * worldPos;
   }
@@ -111,6 +121,7 @@ const fragmentShader = /* glsl */ `
   varying float vWaveHeight;
   varying float vJacobian;
   varying float vSurfaceY;
+  varying float vDepth;
 
   // 岸线「湿边/消退」泡沫：浅水带内随波相位来回拉退，紧贴水线再补一道细湿线
   float shorelineFoam(float depth, float t, vec2 xz, float fn) {
@@ -123,8 +134,12 @@ const fragmentShader = /* glsl */ `
   void main() {
     // 世界坐标 → 高度纹理 UV
     vec2 uv = (vWorldPos.xz / uWorldSize) + 0.5;
+    float h = vDepth;                       // GPU 物理水深
+    // 干地遮罩：h≈0（无水体）处丢弃 / 渐隐，海与淹没区保留
+    float waterMask = smoothstep(0.0, 0.05, h);
+    if (waterMask < 0.001) discard;
     float terrainH = texture2D(uHeightTex, uv).r;
-    float depth = uWaterLevel - terrainH;
+    float depth = max(h, 0.0);          // 水柱深 ≈ h（满淹时 = 海平面 - 地形）
 
     // 深度色：浅绿松石 → 青 → 深蓝
     vec3 waterCol;
@@ -152,8 +167,8 @@ const fragmentShader = /* glsl */ `
     lit = mix(lit, uSkyColor, fres * 0.45);
 
     // ── 泡沫升级 ──
-    // 实际水面深度（用波面高度而非静态水位，接高度场后自动正确）
-    float fdepth = vSurfaceY - terrainH;
+    // 实际水面深度用物理水深 h（波面起伏叠加在 h 基面上，h 即水柱深）
+    float fdepth = depth;
     // 程序化滚动噪声（零贴图，复用 glslChunks 的 fbm2）
     float fn = fbm2(vWorldPos.xz * uFoamScale + uTime * uFoamSpeed * vec2(0.3, -0.2));
     // ① Jacobian 白帽：波面折叠/破碎处（J 跌破阈值）生成，乘噪声做纹理感
@@ -169,6 +184,7 @@ const fragmentShader = /* glsl */ `
     float alpha = mix(0.58, 0.93, smoothstep(0.0, 2.5, depth));
     alpha = mix(alpha, 1.0, foam * 0.6);
     alpha = mix(alpha, 1.0, fres * 0.35);
+    alpha *= waterMask;   // 干地渐隐到全透（与 discard 共同剔除无水区）
 
     // 手动指数雾
     float dist = length(uCameraPos - vWorldPos);
@@ -195,6 +211,7 @@ export function createWaterMaterial(): WaterMaterial {
     uSunDir: { value: new THREE.Vector3(0.45, 0.78, 0.35).normalize() },
     uSunColor: { value: new THREE.Color('#ffe9c4') },
     uHeightTex: { value: getHeightFieldTexture() },
+    uWaterHeight: { value: null },
     uWorldSize: { value: WORLD_SIZE },
     uWaterLevel: { value: WATER_LEVEL },
     uShallowCol: { value: new THREE.Color('#56d6c8') },

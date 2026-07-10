@@ -9,7 +9,7 @@
  */
 /**
  * 根组件 — 版本C（融合版）
- * Canvas: frameloop="demand" + Effects 接管渲染 + three 内置 ACES
+ * Canvas: frameloop="always"（持续动画场景）+ Effects 用 priority=1 接管渲染 + three 内置 ACES
  */
 import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
@@ -52,7 +52,7 @@ export default function App() {
   return (
     <>
       <Canvas
-        frameloop="demand"
+        frameloop="always"
         shadows
         dpr={[1, PERF.maxDpr]}
         gl={{

@@ -24,3 +24,19 @@ export const BASE_Y = -9
 
 /** 水着色器采样地形高度用的纹理分辨率。需覆盖世界精度。 */
 export const HEIGHT_TEX_SIZE = 512
+
+/** 物理水 GPU 模拟网格分辨率（Virtual Pipes ping-pong 纹理边长）。
+ *  128 在 GPU 上每帧 2 趟约 3.3万 texel，开销可忽略；如需更精细岸线可调 256。 */
+export const WATER_SIM_SIZE = 128
+
+/** 虚拟管道导水系数 K（越大流得越快，过大不稳；与 CPU 参考求解器一致） */
+export const SIM_K = 0.2
+
+/** 单步时间步长 dt（固定，不喂真实 delta 以防帧率抖动击穿稳定条件） */
+export const SIM_DT = 1.0
+
+/** 每帧子步数（加速收敛 / 灌水观感） */
+export const SIM_SUBSTEPS = 2
+
+/** 单步允许流出比例上限（留缓冲防负水深爆炸，与 CPU 参考一致） */
+export const SIM_OUT_BUFFER = 0.9

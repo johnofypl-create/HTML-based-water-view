@@ -1,7 +1,7 @@
 /**
  * @module postprocessing/Effects
  * @layer postprocessing（域层）
- * @purpose 后处理链（Bloom + DoF + SMAA + 输出，frameloop=demand 常驻 invalidate）
+ * @purpose 后处理链（Bloom + DoF + SMAA + 输出；frameloop=always 下用 priority=1 接管渲染，避免 R3F 二次 gl.render 双渲）
  * @dependsOn ['state/lightingState']
  * @exports [Effects, Effects]
  * @aiEdit
@@ -31,7 +31,7 @@ import { lightingState } from '../state/lightingState'
 const FOCUS_POINT = new THREE.Vector3(0, 1.5, -4)
 
 export default function Effects() {
-  const { gl, scene, camera, size, invalidate } = useThree()
+  const { gl, scene, camera, size } = useThree()
   const bloomRef = useRef<UnrealBloomPass | null>(null)
   const bokehRef = useRef<BokehPass | null>(null)
   const composerRef = useRef<EffectComposer | null>(null)
@@ -67,7 +67,6 @@ export default function Effects() {
     comp.addPass(output)
 
     composerRef.current = comp
-    invalidate()
 
     return () => {
       comp.dispose()
@@ -81,6 +80,9 @@ export default function Effects() {
     }
   }, [size.width, size.height])
 
+  // priority=1 接管渲染：告诉 R3F 本帧由我们调用 composer.render()，
+  // 跳过其默认的 gl.render(scene,camera)，消除"composer 渲完又被无后处理的
+  // 自动渲染覆盖"的双渲 bug（既省一次完整场景绘制，又让 Bloom/DoF 真正上屏）。
   useFrame(() => {
     if (!composerRef.current) return
 
@@ -96,8 +98,7 @@ export default function Effects() {
     }
 
     composerRef.current.render()
-    invalidate()
-  })
+  }, 1)
 
   return null
 }

@@ -7,6 +7,7 @@ import { useMemo, useRef, useLayoutEffect } from 'react'
 import * as THREE from 'three'
 import { sampleVegetation } from '../utils/sampling'
 import { PERF, SEED } from '../config/constants'
+import { registerSplashTarget } from '../water/splashTargets'
 
 export default function Rocks() {
   const meshRef = useRef<THREE.InstancedMesh>(null)
@@ -74,6 +75,21 @@ export default function Rocks() {
     })
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+  }, [instances])
+
+  // 把每个岩石登记为溅水目标（礁石拍浪），卸载时注销
+  useLayoutEffect(() => {
+    const offs = instances.map((inst) => {
+      const [x, y, z] = inst.position
+      const waterlineY = y + inst.scale * 0.2 // 岩石顶约在中心 + 0.2×scale
+      return registerSplashTarget({
+        pos: new THREE.Vector3(x, waterlineY, z),
+        radius: inst.scale,
+        waterlineY,
+        phase: Math.random() * Math.PI * 2,
+      })
+    })
+    return () => offs.forEach((o) => o())
   }, [instances])
 
   return (

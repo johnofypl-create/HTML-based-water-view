@@ -16,6 +16,7 @@ import CameraRig from './camera/CameraRig'
 import Effects from './postprocessing/Effects'
 import Vegetation from './environment/Vegetation'
 import AudioUpdater from './audio/AudioUpdater'
+import SprayParticles from './water/SprayParticles'
 import UI from './ui/UI'
 import { CAMERA, PERF } from './config/constants'
 
@@ -26,6 +27,7 @@ function Scene() {
       <Lighting />
       <Terrain />
       <Water />
+      <SprayParticles />
       <River />
       <Structures />
       <ExhibitionBase />

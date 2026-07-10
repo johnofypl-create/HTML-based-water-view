@@ -11,6 +11,7 @@ import * as THREE from 'three'
 import { GLSL_HASH } from '../utils/glslChunks'
 import { WATER_LEVEL, WORLD_SIZE } from '../config/constants'
 import { getHeightFieldTexture } from './heightField'
+import { GERSTNER_GLSL } from './gerstner.glsl'
 
 export interface WaterMaterial extends THREE.ShaderMaterial {
   uniforms: {
@@ -28,6 +29,14 @@ export interface WaterMaterial extends THREE.ShaderMaterial {
     uFogColor: { value: THREE.Color }
     uFogDensity: { value: number }
     uSkyColor: { value: THREE.Color }
+    // ── 泡沫升级（Jacobian 白帽 + 滚动噪声 + 岸线湿边） ──
+    uFoamScale: { value: number }
+    uFoamSpeed: { value: number }
+    uFoamJacLo: { value: number }
+    uFoamJacHi: { value: number }
+    uFoamAmount: { value: number }
+    uFoamShoreDepth: { value: number }
+    uFoamShoreSpeed: { value: number }
   }
 }
 
@@ -37,40 +46,26 @@ const vertexShader = /* glsl */ `
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   varying float vWaveHeight;
+  varying float vJacobian;
+  varying float vSurfaceY;
 
-  // 简单 Gerstner 波（3 个方向叠加）
-  vec3 gerstner(vec2 pos, float t, out vec3 normal) {
-    float amp1 = 0.18, amp2 = 0.12, amp3 = 0.07;
-    vec2 d1 = normalize(vec2(1.0, 0.4));
-    vec2 d2 = normalize(vec2(-0.5, 1.0));
-    vec2 d3 = normalize(vec2(0.3, -0.8));
-    float f1 = 0.45, f2 = 0.7, f3 = 1.1;
-    float s1 = 0.8, s2 = 1.1, s3 = 1.5;
-
-    float p1 = dot(d1, pos) * f1 + t * s1;
-    float p2 = dot(d2, pos) * f2 + t * s2;
-    float p3 = dot(d3, pos) * f3 + t * s3;
-
-    float h = amp1 * sin(p1) + amp2 * sin(p2) + amp3 * sin(p3);
-
-    // 解析法线（对 pos 求偏导）
-    float dx = amp1 * d1.x * f1 * cos(p1) + amp2 * d2.x * f2 * cos(p2) + amp3 * d3.x * f3 * cos(p3);
-    float dz = amp1 * d1.y * f1 * cos(p1) + amp2 * d2.y * f2 * cos(p2) + amp3 * d3.y * f3 * cos(p3);
-    normal = normalize(vec3(-dx, 1.0, -dz));
-    return vec3(0.0, h, 0.0);
-  }
+  // 标准 Gerstner（含水平位移 + 解析法线 + 雅可比），由 gerstner.ts 生成
+  ${GERSTNER_GLSL}
 
   void main() {
     vec3 pos = position;
     // position 在 XZ 平面（PlaneGeometry 旋转后），y=0
     vec2 worldXZ = pos.xz;
     vec3 n;
-    vec3 disp = gerstner(worldXZ, uTime, n);
-    pos += disp;
+    float jac;
+    vec3 disp = gerstnerSolve(worldXZ, uTime, n, jac);
+    pos += disp;                 // 含水平位移的标准 Gerstner
     vWaveHeight = disp.y;
+    vJacobian = jac;
 
     vec4 worldPos = modelMatrix * vec4(pos, 1.0);
     vWorldPos = worldPos.xyz;
+    vSurfaceY = worldPos.y;      // = WATER_LEVEL + 波高
     vNormal = n;
     gl_Position = projectionMatrix * viewMatrix * worldPos;
   }
@@ -93,10 +88,27 @@ const fragmentShader = /* glsl */ `
   uniform vec3 uFogColor;
   uniform float uFogDensity;
   uniform vec3 uSkyColor;
+  uniform float uFoamScale;
+  uniform float uFoamSpeed;
+  uniform float uFoamJacLo;
+  uniform float uFoamJacHi;
+  uniform float uFoamAmount;
+  uniform float uFoamShoreDepth;
+  uniform float uFoamShoreSpeed;
 
   varying vec3 vWorldPos;
   varying vec3 vNormal;
   varying float vWaveHeight;
+  varying float vJacobian;
+  varying float vSurfaceY;
+
+  // 岸线「湿边/消退」泡沫：浅水带内随波相位来回拉退，紧贴水线再补一道细湿线
+  float shorelineFoam(float depth, float t, vec2 xz, float fn) {
+    float retreat = 0.5 + 0.5 * sin(t * uFoamShoreSpeed + xz.x * 0.5 + xz.y * 0.3);
+    float band = (1.0 - smoothstep(0.0, uFoamShoreDepth, depth)) * mix(0.4, 1.0, retreat);
+    float wet = (1.0 - smoothstep(0.0, uFoamShoreDepth * 0.18, depth)) * retreat;
+    return band * (0.6 + 0.4 * fn) + wet * 0.5;
+  }
 
   void main() {
     // 世界坐标 → 高度纹理 UV
@@ -129,11 +141,19 @@ const fragmentShader = /* glsl */ `
     float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
     lit = mix(lit, uSkyColor, fres * 0.45);
 
-    // 岸线泡沫（浅水 + 波峰）
-    float foamLine = smoothstep(0.5, 0.0, depth) * (0.6 + 0.4 * vnoise(vWorldPos.xz * 6.0 + uTime * 0.3));
-    float foamCrest = smoothstep(0.18, 0.28, vWaveHeight) * 0.5;
-    float foam = clamp(foamLine + foamCrest, 0.0, 1.0);
-    lit = mix(lit, uFoamCol, foam * 0.85);
+    // ── 泡沫升级 ──
+    // 实际水面深度（用波面高度而非静态水位，接高度场后自动正确）
+    float fdepth = vSurfaceY - terrainH;
+    // 程序化滚动噪声（零贴图，复用 glslChunks 的 fbm2）
+    float fn = fbm2(vWorldPos.xz * uFoamScale + uTime * uFoamSpeed * vec2(0.3, -0.2));
+    // ① Jacobian 白帽：波面折叠/破碎处（J 跌破阈值）生成，乘噪声做纹理感
+    float jacFoam = (1.0 - smoothstep(uFoamJacLo, uFoamJacHi, vJacobian)) * mix(0.55, 1.0, fn);
+    // ② 波峰泡沫（保留并细调）
+    float foamCrest = smoothstep(0.12, 0.24, vWaveHeight) * (0.4 + 0.5 * fn);
+    // ③ 岸线湿边消退
+    float shore = shorelineFoam(fdepth, uTime, vWorldPos.xz, fn);
+    float foam = clamp(jacFoam + foamCrest * 0.5 + shore, 0.0, 1.0);
+    lit = mix(lit, uFoamCol, foam * uFoamAmount);
 
     // 透明度：浅水更透显沙底，深水近不透明（清澈感）
     float alpha = mix(0.58, 0.93, smoothstep(0.0, 2.5, depth));
@@ -174,6 +194,14 @@ export function createWaterMaterial(): WaterMaterial {
     uFogColor: { value: new THREE.Color('#d4e2ea') },
     uFogDensity: { value: 0.011 },
     uSkyColor: { value: new THREE.Color('#bcd4e6') },
+    // 泡沫升级默认参数（可调）
+    uFoamScale: { value: 1.6 },
+    uFoamSpeed: { value: 0.25 },
+    uFoamJacLo: { value: 0.5 },
+    uFoamJacHi: { value: 0.86 },
+    uFoamAmount: { value: 0.9 },
+    uFoamShoreDepth: { value: 0.6 },
+    uFoamShoreSpeed: { value: 1.0 },
   }
 
   return mat

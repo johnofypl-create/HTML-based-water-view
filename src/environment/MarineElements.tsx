@@ -10,6 +10,7 @@ import { useMemo, useRef, useLayoutEffect } from 'react'
 import * as THREE from 'three'
 import { heightAt } from '../utils/terrain'
 import { WATER_LEVEL, WORLD_SIZE } from '../config/constants'
+import { registerSplashTarget } from '../water/splashTargets'
 
 // ── 确定性种子随机 ──
 function srand(seed: number): number {
@@ -134,6 +135,19 @@ export default function MarineElements() {
   const plantData = useUnderwaterPlantData()
   const trailData = useTrailData()
   const islands = useIslandData()
+
+  // 把 3 个小岛登记为溅水目标（礁石拍浪），卸载时注销
+  useLayoutEffect(() => {
+    const offs = islands.map((island) =>
+      registerSplashTarget({
+        pos: new THREE.Vector3(island.x, island.islandY, island.z),
+        radius: 0.55,
+        waterlineY: island.islandY,
+        phase: Math.random() * Math.PI * 2,
+      }),
+    )
+    return () => offs.forEach((o) => o())
+  }, [islands])
 
   // 几何体
   const coralGeo = useMemo(() => new THREE.ConeGeometry(0.5, 1, 5), [])

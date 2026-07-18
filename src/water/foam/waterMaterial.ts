@@ -60,9 +60,13 @@ const {
 const uTime = uniform(0)
 const uWorldSize = uniform(WORLD_SIZE)
 const uWaterLevel = uniform(WATER_LEVEL)
-const uEnablePhysics = uniform(0) // 0/1（TSL 偏好 number，>0.5 视作 true）
+const uEnablePhysics = uniform(0.0) // 0/1（TSL 偏好 number，>0.5 视作 true）
 const uHeightTex = uniform(getHeightFieldTexture() as any)
-const uWaterHeight = uniform(null as any)
+// Direct texture reference (not uniform — TSL texture() rejects UniformNode wrapping)
+const waterHeightTex = new THREE.DataTexture(new Float32Array(128 * 128).fill(10.0), 128, 128, THREE.RedFormat, THREE.FloatType)
+waterHeightTex.needsUpdate = true
+
+
 const uCameraPos = uniform(new THREE.Vector3())
 const uSunDir = uniform(new THREE.Vector3(0.45, 0.78, 0.35).normalize())
 const uSunColor = uniform(new THREE.Color('#ffe9c4'))
@@ -181,14 +185,11 @@ const gerstnerSolve = Fn(([p, t, nrm, jac]: any) => {
 })
 
 // ============ 共享：泡沫量计算（colorNode 与 opacityNode 复用）============
+//  无 Gerstner 波 → 雅可比=1（无白帽）、波高=0 → 只保留岸线湿边 + 程序化噪声
 const computeFoam = Fn(([wp, depth]: any) => {
   const fn = fbm2(wp.xz.mul(uFoamScale).add(uTime.mul(uFoamSpeed).mul(vec2(0.3, -0.2))))
-  const jacFoam = float(1.0)
-    .sub(smoothstep(uFoamJacLo, uFoamJacHi, vJacobian))
-    .mul(mix(float(0.55), float(1.0), fn))
-  const foamCrest = smoothstep(0.12, 0.24, vWaveHeight).mul(float(0.4).add(float(0.5).mul(fn)))
   const shore = shorelineFoam(depth, uTime, wp.xz, fn)
-  return clamp(jacFoam.add(foamCrest.mul(0.5)).add(shore), 0.0, 1.0)
+  return clamp(shore, 0.0, 1.0)
 })
 
 export interface WaterMaterial extends THREE.MeshBasicNodeMaterial {
@@ -200,7 +201,7 @@ export interface WaterMaterial extends THREE.MeshBasicNodeMaterial {
     uSunColor: { value: THREE.Color }
     uHeightTex: { value: THREE.DataTexture | null }
     uWaterHeight: { value: THREE.Texture | null }
-    uEnablePhysics: { value: boolean }
+    uEnablePhysics: { value: number }
     uWorldSize: { value: number }
     uWaterLevel: { value: number }
     uShallowCol: { value: THREE.Color }
@@ -227,15 +228,15 @@ export function createWaterMaterial(): WaterMaterial {
   mat.side = THREE.DoubleSide
   mat.fog = false // 我们手算 fog，不让 NodeMaterial 自动 fog
 
-  // —— positionNode: 暂不设 ——
-  //   TSL MeshBasicNodeMaterial 对自定义 positionNode 有兼容性问题（与 P4a 同根）。
-  //   任何非零位移都会让 WebGPURenderer 全黑。暂用默认变换 → 静态平面水。
-  //   注记：varying 节点由颜色写了默认值，不需要 positionNode 写入也能工作。
+  // —— positionNode: 暂不设（P4a 同根的 MeshBasicNodeMaterial 兼容性 bug） ——
+  //   所有 varying（vDepth/vNormalVar/vWaveHeight/vJacobian）不由 positionNode 写入，
+  //   改为在 colorNode/opacityNode 中直接从 uWaterHeight 纹理读取水深。
 
-  // —— colorNode: 完整水着色器 ——
+  // —— colorNode: 完整水着色器（从纹理直接读水深 + 硬编码法线=世界Y）——
   mat.colorNode = Fn(() => {
     const wp = positionWorld
-    const h = vDepth
+    const uv = wp.xz.div(uWorldSize).add(0.5)
+    const h = texture(waterHeightTex as any, uv).r
     const depth = max(h, 0.0)
 
     const waterColShallow = mix(uShallowCol, uMidCol, smoothstep(0.0, 1.5, depth))
@@ -243,7 +244,8 @@ export function createWaterMaterial(): WaterMaterial {
     const waterCol = depth.lessThan(1.5).select(waterColShallow, waterColDeep)
     const waterColDim = waterCol.mul(mix(float(1.0), float(0.75), smoothstep(0.0, 8.0, depth)))
 
-    const N = normalize(vNormalVar)
+    // 硬编码法线 = 世界 Y ↑（无 Gerstner 波 → 默认平面法线）
+    const N = vec3(0.0, 1.0, 0.0)
     const diff = max(dot(N, uSunDir), 0.0)
     let lit = waterColDim.mul(float(0.55).add(float(0.6).mul(diff))).mul(uSunColor)
 
@@ -267,10 +269,11 @@ export function createWaterMaterial(): WaterMaterial {
     return lit
   })()
 
-  // —— opacityNode: 每像素 alpha ——
+  // —— opacityNode: 每像素 alpha（从纹理直接读水深）——
   mat.opacityNode = Fn(() => {
     const wp = positionWorld
-    const h = vDepth
+    const uv = wp.xz.div(uWorldSize).add(0.5)
+    const h = texture(waterHeightTex as any, uv).r
     const depth = max(h, 0.0)
     const waterMask = uEnablePhysics.greaterThan(0.5).select(smoothstep(0.0, 0.05, h), float(1.0))
 
@@ -278,7 +281,7 @@ export function createWaterMaterial(): WaterMaterial {
     const foam = computeFoam(wp, depth)
     alpha = mix(alpha, float(1.0), foam.mul(0.6))
 
-    const N = normalize(vNormalVar)
+    const N = vec3(0.0, 1.0, 0.0)
     const V = normalize(uCameraPos.sub(wp))
     const fres = pow(float(1.0).sub(max(dot(N, V), 0.0)), 4.0)
     alpha = mix(alpha, float(1.0), fres.mul(0.35))
@@ -293,8 +296,8 @@ export function createWaterMaterial(): WaterMaterial {
     uSunDir: uSunDir as unknown as { value: THREE.Vector3 },
     uSunColor: uSunColor as unknown as { value: THREE.Color },
     uHeightTex: uHeightTex as unknown as { value: THREE.DataTexture | null },
-    uWaterHeight: uWaterHeight as unknown as { value: THREE.Texture | null },
-    uEnablePhysics: uEnablePhysics as unknown as { value: boolean },
+    uWaterHeight: waterHeightTex as unknown as { value: THREE.Texture | null },
+    uEnablePhysics: uEnablePhysics as unknown as { value: number },
     uWorldSize: uWorldSize as unknown as { value: number },
     uWaterLevel: uWaterLevel as unknown as { value: number },
     uShallowCol: uShallowCol as unknown as { value: THREE.Color },
@@ -312,6 +315,8 @@ export function createWaterMaterial(): WaterMaterial {
     uFoamShoreDepth: uFoamShoreDepth as unknown as { value: number },
     uFoamShoreSpeed: uFoamShoreSpeed as unknown as { value: number },
   } as WaterMaterial['uniforms']
+
+  ;(mat as any).waterHeightTex = waterHeightTex
 
   return mat
 }

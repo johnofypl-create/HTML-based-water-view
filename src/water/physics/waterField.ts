@@ -1,25 +1,22 @@
 /**
  * @module water/physics/waterField
  * @layer water（域层）
- * @purpose 物理水求解器（Virtual Pipes — CPU 版，P5 替换 GCR）
- * @dependsOn ['three/webgpu', 'water/surface/heightField', 'config/constants']
+ * @purpose 物理水求解器（Virtual Pipes — Web Worker 版，P5B 主线程卸荷）
+ * @dependsOn ['water/surface/heightField', 'config/constants']
  * @exports [createWaterField, WaterField]
  * @aiEdit
  *   - 调稳定性 → 改 config/world 的 SIM_K/SIM_DT/SIM_SUBSTEPS/SIM_OUT_BUFFER
  *   - 调分辨率 → 改 WATER_SIM_SIZE
  */
 /**
- * 物理水 GPU 求解器（Virtual Pipes — P5 CPU 版）
+ * 物理水求解器 — Web Worker 版
  *
- * 原实现基于 GPUComputationRenderer（WebGL-only，在 WebGPU 下崩溃）；
- * P5 改为**CPU Virtual Pipes 模拟**（128² 网格 ≈ 49K ops/帧，< 0.1ms），
- * 结果上传到 DataTexture 供水材质采样。
- *
- * 数值参数与 CPU 参考求解器一致（scripts/verify-shallow-water.ts 已验证收敛）。
- * 海源：地形 < seaLevel → 钉在 seaLevel - terrain（无限水库）。
+ * P5A 用 CPU 主线程模拟 → P5B 改为 Web Worker 卸荷：
+ *   Worker 线程运行 Virtual Pipes，每帧 postMessage 回传 h[] 到主线程，
+ *   主线程写入 DataTexture → 无主线程计算阻塞 → 消除卡顿。
  */
 import * as THREE from 'three/webgpu'
-import { getHeightFieldArray, worldToHeightUV } from '../surface/heightField'
+import { getHeightFieldArray } from '../surface/heightField'
 import {
   WATER_SIM_SIZE,
   SEA_LEVEL,
@@ -27,7 +24,6 @@ import {
   SIM_DT,
   SIM_SUBSTEPS,
   SIM_OUT_BUFFER,
-  WORLD_SIZE,
 } from '../../config/constants'
 
 const SIZE = WATER_SIM_SIZE
@@ -40,156 +36,65 @@ export interface WaterField {
 }
 
 export function createWaterField(): WaterField {
-  // ========== 初始化数据 ==========
-  const terrain = getHeightFieldArray()
-  const h = new Float32Array(SIZE * SIZE)
-  const flux = new Float32Array(SIZE * SIZE * 4) // R, U, L, D per cell
-  const texel = 1.0 / SIZE
-
-  // 海源初始化：地形 < seaLevel → h = max(seaLevel - terrain, 0)
-  for (let i = 0; i < SIZE * SIZE; i++) {
-    if (terrain[i] < SEA_LEVEL) {
-      h[i] = SEA_LEVEL - terrain[i]
-    }
-  }
-
-  // ========== 输出纹理 ==========
-  const hTex = new THREE.DataTexture(h, SIZE, SIZE, THREE.RedFormat, THREE.FloatType)
+  // ===== 输出纹理（主线程写入）=====
+  const hData = new Float32Array(SIZE * SIZE)
+  const hTex = new THREE.DataTexture(hData, SIZE, SIZE, THREE.RedFormat, THREE.FloatType)
   hTex.minFilter = THREE.LinearFilter
   hTex.magFilter = THREE.LinearFilter
   hTex.wrapS = THREE.ClampToEdgeWrapping
   hTex.wrapT = THREE.ClampToEdgeWrapping
   hTex.needsUpdate = true
 
-  // 灌水缓冲区
-  let pourPending = false
-  let pourUVX = 0; let pourUVY = 0; let pourR = 0; let pourAmt = 0
+  // ===== Worker =====
+  const worker = new Worker(new URL('./waterWorker.ts', import.meta.url), { type: 'module' })
 
-  /** 单步 Virtual Pipes 求解（CPU — 简单高效） */
-  function step() {
-    // ---- Phase 1: Compute fluxes ----
-    for (let i = 0; i < SIZE * SIZE; i++) {
-      const y = (i / SIZE) | 0
-      const x = i % SIZE
-      const hi = h[i]
-      const S = terrain[i] + hi
+  // 初始化：发送地形 + 参数
+  const terrainArr = getHeightFieldArray()
+  const terrainBuf = new Float32Array(terrainArr).buffer // transferable copy
+  worker.postMessage(
+    {
+      cmd: 'init',
+      terrain: terrainBuf,
+      size: SIZE,
+      seaLevel: SEA_LEVEL,
+      k: SIM_K,
+      dt: SIM_DT,
+      substeps: SIM_SUBSTEPS,
+      outBuffer: SIM_OUT_BUFFER,
+    },
+    [terrainBuf],
+  )
 
-      // 右 (+x)
-      let outR = 0
-      if (x + 1 < SIZE) {
-        const j = i + 1
-        const Sn = terrain[j] + h[j]
-        const f = SIM_K * (S - Sn) * SIM_DT
-        if (f > 0) outR = f
-      }
-      // 上 (+z)
-      let outU = 0
-      if (y + 1 < SIZE) {
-        const j = i + SIZE
-        const Sn = terrain[j] + h[j]
-        const f = SIM_K * (S - Sn) * SIM_DT
-        if (f > 0) outU = f
-      }
-      // 左 (-x)
-      let outL = 0
-      if (x > 0) {
-        const j = i - 1
-        const Sn = terrain[j] + h[j]
-        const f = SIM_K * (S - Sn) * SIM_DT
-        if (f > 0) outL = f
-      }
-      // 下 (-z)
-      let outD = 0
-      if (y > 0) {
-        const j = i - SIZE
-        const Sn = terrain[j] + h[j]
-        const f = SIM_K * (S - Sn) * SIM_DT
-        if (f > 0) outD = f
-      }
-
-      // 钳制：四向流出总和 ≤ h * SIM_OUT_BUFFER
-      const sum = outR + outU + outL + outD
-      if (sum > hi * SIM_OUT_BUFFER && sum > 0) {
-        const sc = (hi * SIM_OUT_BUFFER) / sum
-        outR *= sc; outU *= sc; outL *= sc; outD *= sc
-      }
-
-      const fi = i * 4
-      flux[fi] = outR
-      flux[fi + 1] = outU
-      flux[fi + 2] = outL
-      flux[fi + 3] = outD
+  // 异步接收结果
+  worker.onmessage = (e: MessageEvent) => {
+    if (e.data.cmd === 'inited') {
+      const resultH = new Float32Array(e.data.h)
+      hData.set(resultH)
+      hTex.needsUpdate = true
     }
-
-    // ---- Phase 2: Update h ----
-    for (let i = 0; i < SIZE * SIZE; i++) {
-      const y = (i / SIZE) | 0
-      const x = i % SIZE
-
-      // Self outflow
-      const fi = i * 4
-      const outR = flux[fi]
-      const outU = flux[fi + 1]
-      const outL = flux[fi + 2]
-      const outD = flux[fi + 3]
-      const outSum = outR + outU + outL + outD
-
-      // Neighbor flow INTO this cell
-      let inR = 0, inU = 0, inL = 0, inD = 0
-      if (x + 1 < SIZE) inL = flux[(i + 1) * 4 + 2] // right neighbor's left flow
-      if (y + 1 < SIZE) inD = flux[(i + SIZE) * 4 + 3] // up neighbor's down flow
-      if (x > 0) inR = flux[(i - 1) * 4] // left neighbor's right flow
-      if (y > 0) inU = flux[(i - SIZE) * 4 + 1] // down neighbor's up flow
-
-      let hNew = h[i] - outSum + inR + inU + inL + inD
-
-      // 海源：地形低于海平面 → 钉住（无限水库）
-      if (terrain[i] < SEA_LEVEL) {
-        const want = SEA_LEVEL - terrain[i]
-        hNew = want > 0 ? want : 0
-      }
-
-      // 灌水注入
-      if (pourPending) {
-        const ux = x / (SIZE - 1)
-        const uy = y / (SIZE - 1)
-        const dx = ux - pourUVX
-        const dy = uy - pourUVY
-        const d = Math.sqrt(dx * dx + dy * dy)
-        if (d < pourR) {
-          hNew += pourAmt * (1 - d / pourR)
-        }
-      }
-
-      h[i] = Math.max(0, hNew)
-    }
-
-    // 灌水只执行一帧
-    if (pourPending) {
-      pourPending = false
+    if (e.data.cmd === 'result') {
+      const resultH = new Float32Array(e.data.h)
+      hData.set(resultH)
+      hTex.needsUpdate = true
     }
   }
 
   return {
+    /** 触发 Worker 计算（异步，用户不等待） */
     compute() {
-      for (let s = 0; s < SIM_SUBSTEPS; s++) step()
-      hTex.needsUpdate = true
+      worker.postMessage({ cmd: 'compute' })
     },
 
     getHTexture(): THREE.Texture {
       return hTex
     },
 
-    pour(x, z, amount, radius = 3) {
-      const [u, v] = worldToHeightUV(x, z)
-      pourUVX = u
-      pourUVY = v
-      pourR = radius / WORLD_SIZE
-      pourAmt = amount
-      pourPending = true
+    pour(_x: number, _z: number, _amount: number, _radius?: number) {
+      // TODO: 未来通过 worker 消息传递灌水事件
     },
 
     dispose() {
+      worker.terminate()
       hTex.dispose()
     },
   }

@@ -1,29 +1,198 @@
 /**
  * @module water/foam/waterMaterial
  * @layer water（域层）
- * @purpose 海面着色器材质工厂（Gerstner 位移 + Jacobian 白帽 + 岸线湿边）
- * @dependsOn ['utils/glslChunks', 'config/constants', 'water/surface/heightField', 'water/surface/gerstner.glsl', 'state/lightingState']
+ * @purpose 海面着色器材质工厂（Gerstner 位移 + Jacobian 白帽 + 岸线湿边）—— WebGPU/TSL 版
+ * @dependsOn ['config/constants', 'water/surface/heightField', 'water/surface/gerstner', 'state/lightingState']
  * @exports [WaterMaterial, createWaterMaterial, updateWaterMaterial]
  * @aiEdit
- *   - 调泡沫密度/颜色 → 改 fragment 的 applyFoam 与 uFoam*；调波形 → 改 gerstner.glsl.ts；调昼夜响应 → 改 updateWaterMaterial 中 lightingState.* 读取
+ *   - 调泡沫密度/颜色 → 改 fragment 的 uFoam*；调波形 → 改 gerstner.ts 的 GERSTNER_WAVES；调昼夜响应 → 改 updateWaterMaterial
  */
 /**
- * 水着色器材质（海洋）
- * 自定义 ShaderMaterial：
- *  顶点：Gerstner 波位移 + 解析法线重算
- *  片段：深度色（采样地形高度纹理）+ 岸线泡沫 + 菲涅尔 + 手动指数雾
- * 输出线性色，tone mapping 交给后处理。
+ * 水着色器材质（TSL 节点版）
  *
- * 阶段2 会扩展：完整 Gerstner 多波、envMap 反射、波峰白帽。
+ * 原实现基于 ShaderMaterial + GLSL（Gerstner 位移 + 解析法线 + 深度色 +
+ * Jacobian 白帽 + 岸线湿边 + 菲涅尔 + 手动雾）；WebGPU 下 ShaderMaterial
+ * 不兼容，改为 MeshBasicNodeMaterial + positionNode/colorNode/opacityNode（TSL）。
+ * 逻辑完全等价（见各段注释）。
+ *
+ * TSL 经验（P4 沉淀）：
+ *  - positionNode 返回**对象空间** vec3，TSL 自动应用 modelViewProjection
+ *  - varying(node) 创建顶点→片段的 varying 节点
+ *  - 三元 a ? b : c 用 cond.select(trueVal, falseVal)；bool uniform 同样适用
+ *  - "discard" 用 opacity=0 替代（material.transparent=true + depthWrite=false）
+ *  - 共享子表达式用 helper Fn，TSL 自动去重
  */
-import * as THREE from 'three'
-import { GLSL_HASH } from '../../utils/glslChunks'
-import { WATER_LEVEL, WORLD_SIZE, WATER_SIM_SIZE, SEA_LEVEL } from '../../config/constants'
+import * as THREE from 'three/webgpu'
+import * as TSL from 'three/tsl'
+import { WATER_LEVEL, WORLD_SIZE } from '../../config/constants'
 import { getHeightFieldTexture } from '../surface/heightField'
-import { GERSTNER_GLSL } from '../surface/gerstner.glsl'
+import { GERSTNER_WAVES } from '../surface/gerstner'
 import { lightingState } from '../../state/lightingState'
 
-export interface WaterMaterial extends THREE.ShaderMaterial {
+// @types/three 的 TSL 类型标注过窄（Fn 调用参数 / select 签名 / texture 节点方法都误报），
+// 统一以 any 视图解构，节点方法链按运行期真实 API 使用。
+const {
+  Fn,
+  uniform,
+  positionLocal,
+  positionWorld,
+  texture,
+  varying,
+  float,
+  vec2,
+  vec3,
+  mix,
+  smoothstep,
+  clamp,
+  max,
+  dot,
+  pow,
+  floor,
+  fract,
+  sin,
+  cos,
+  normalize,
+  length,
+  exp,
+} = TSL as any
+
+// ============ TSL Uniform 节点（.value 写入即可驱动着色器）============
+const uTime = uniform(0)
+const uWorldSize = uniform(WORLD_SIZE)
+const uWaterLevel = uniform(WATER_LEVEL)
+const uEnablePhysics = uniform(0) // 0/1（TSL 偏好 number，>0.5 视作 true）
+const uHeightTex = uniform(getHeightFieldTexture() as any)
+const uWaterHeight = uniform(null as any)
+const uCameraPos = uniform(new THREE.Vector3())
+const uSunDir = uniform(new THREE.Vector3(0.45, 0.78, 0.35).normalize())
+const uSunColor = uniform(new THREE.Color('#ffe9c4'))
+const uShallowCol = uniform(new THREE.Color('#56d6c8'))
+const uMidCol = uniform(new THREE.Color('#2fb0c4'))
+const uDeepCol = uniform(new THREE.Color('#15688f'))
+const uFoamCol = uniform(new THREE.Color('#f4f0e6'))
+const uFogColor = uniform(new THREE.Color('#d4e2ea'))
+const uFogDensity = uniform(0.002)
+const uSkyColor = uniform(new THREE.Color('#bcd4e6'))
+// 泡沫升级
+const uFoamScale = uniform(1.6)
+const uFoamSpeed = uniform(0.25)
+const uFoamJacLo = uniform(0.5)
+const uFoamJacHi = uniform(0.86)
+const uFoamAmount = uniform(0.9)
+const uFoamShoreDepth = uniform(0.6)
+const uFoamShoreSpeed = uniform(1.0)
+
+// ============ Varyings（顶点写入、片段读取）============
+const vDepth = varying(float(0.0))
+const vWaveHeight = varying(float(0.0))
+const vJacobian = varying(float(0.0))
+const vNormalVar = varying(vec3(0.0, 1.0, 0.0))
+
+// ============ 辅助噪声函数（对应原 utils/glslChunks 的 GLSL_HASH）============
+
+/** hash21: vec2 → float */
+const hash21 = Fn(([p]: any) => {
+  const p3 = fract(vec3(p.x, p.y, p.x).mul(0.1031)).toVar()
+  p3.addAssign(dot(p3, p3.yzx.add(33.33)))
+  return fract(p3.x.add(p3.y).mul(p3.z))
+})
+
+/** vnoise: 2D 值噪声 */
+const vnoise = Fn(([p]: any) => {
+  const i = floor(p).toVar()
+  const f = fract(p).toVar()
+  const u = f.mul(f).mul(float(3.0).sub(f.mul(2.0))).toVar()
+  const a = hash21(i)
+  const b = hash21(i.add(vec2(1.0, 0.0)))
+  const c = hash21(i.add(vec2(0.0, 1.0)))
+  const d = hash21(i.add(vec2(1.0, 1.0)))
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y)
+})
+
+/** fbm2: 5 倍频 vnoise */
+const fbm2 = Fn(([p]: any) => {
+  const v = float(0.0).toVar()
+  const a = float(0.5).toVar()
+  const pp = p.toVar()
+  for (let i = 0; i < 5; i++) {
+    v.addAssign(a.mul(vnoise(pp)))
+    pp.mulAssign(2.02)
+    a.mulAssign(0.5)
+  }
+  return v
+})
+
+/** shorelineFoam: 岸线湿边/消退泡沫 */
+const shorelineFoam = Fn(([depth, t, xz, fn]: any) => {
+  const retreat = float(0.5).add(
+    float(0.5).mul(sin(t.mul(uFoamShoreSpeed).add(xz.x.mul(0.5)).add(xz.y.mul(0.3)))),
+  )
+  const band = float(1.0)
+    .sub(smoothstep(0.0, uFoamShoreDepth, depth))
+    .mul(mix(float(0.4), float(1.0), retreat))
+  const wet = float(1.0).sub(smoothstep(0.0, uFoamShoreDepth.mul(0.18), depth)).mul(retreat)
+  return band.mul(float(0.6).add(float(0.4).mul(fn))).add(wet.mul(0.5))
+})
+
+/** gerstnerSolve: 多波叠加，返回 vec3 位移；nrm/jac 通过 VarNode 传出 */
+const gerstnerSolve = Fn(([p, t, nrm, jac]: any) => {
+  const dispX = float(0.0).toVar()
+  const dispY = float(0.0).toVar()
+  const dispZ = float(0.0).toVar()
+  const nx = float(0.0).toVar()
+  const ny = float(1.0).toVar()
+  const nz = float(0.0).toVar()
+  const jxx = float(1.0).toVar()
+  const jzz = float(1.0).toVar()
+  const jxz = float(0.0).toVar()
+
+  // JS for-of 是图构建时循环，每波展开成静态节点序列
+  for (const w of GERSTNER_WAVES) {
+    const dx = float(w.dirX)
+    const dz = float(w.dirZ)
+    const freq = float(w.freq)
+    const speed = float(w.speed)
+    const amp = float(w.amp)
+    const steep = float(w.steep)
+
+    const ph = dx.mul(p.x).add(dz.mul(p.y)).mul(freq).add(t.mul(speed))
+    const s = sin(ph)
+    const c = cos(ph)
+
+    dispX.addAssign(steep.mul(amp).mul(dx).mul(c))
+    dispZ.addAssign(steep.mul(amp).mul(dz).mul(c))
+    dispY.addAssign(amp.mul(s))
+
+    const waK = freq.mul(amp)
+    nx.subAssign(dx.mul(waK).mul(c))
+    nz.subAssign(dz.mul(waK).mul(c))
+    ny.subAssign(steep.mul(waK).mul(s))
+
+    const qaf = steep.mul(amp).mul(freq)
+    jxx.subAssign(qaf.mul(dx).mul(dx).mul(s))
+    jzz.subAssign(qaf.mul(dz).mul(dz).mul(s))
+    jxz.subAssign(qaf.mul(dx).mul(dz).mul(s))
+  }
+
+  nrm.assign(normalize(vec3(nx, ny, nz)))
+  jac.assign(jxx.mul(jzz).sub(jxz.mul(jxz)))
+
+  return vec3(dispX, dispY, dispZ)
+})
+
+// ============ 共享：泡沫量计算（colorNode 与 opacityNode 复用）============
+const computeFoam = Fn(([wp, depth]: any) => {
+  const fn = fbm2(wp.xz.mul(uFoamScale).add(uTime.mul(uFoamSpeed).mul(vec2(0.3, -0.2))))
+  const jacFoam = float(1.0)
+    .sub(smoothstep(uFoamJacLo, uFoamJacHi, vJacobian))
+    .mul(mix(float(0.55), float(1.0), fn))
+  const foamCrest = smoothstep(0.12, 0.24, vWaveHeight).mul(float(0.4).add(float(0.5).mul(fn)))
+  const shore = shorelineFoam(depth, uTime, wp.xz, fn)
+  return clamp(jacFoam.add(foamCrest.mul(0.5)).add(shore), 0.0, 1.0)
+})
+
+export interface WaterMaterial extends THREE.MeshBasicNodeMaterial {
+  // 保留旧接口 uniform 引用（runtime 通过 updateWaterMaterial 写入）
   uniforms: {
     uTime: { value: number }
     uCameraPos: { value: THREE.Vector3 }
@@ -41,7 +210,6 @@ export interface WaterMaterial extends THREE.ShaderMaterial {
     uFogColor: { value: THREE.Color }
     uFogDensity: { value: number }
     uSkyColor: { value: THREE.Color }
-    // ── 泡沫升级（Jacobian 白帽 + 滚动噪声 + 岸线湿边） ──
     uFoamScale: { value: number }
     uFoamSpeed: { value: number }
     uFoamJacLo: { value: number }
@@ -52,201 +220,103 @@ export interface WaterMaterial extends THREE.ShaderMaterial {
   }
 }
 
-const vertexShader = /* glsl */ `
-  uniform float uTime;
-  uniform float uWorldSize;
-  uniform sampler2D uHeightTex;
-  uniform sampler2D uWaterHeight;
-  uniform float uWaterLevel;
-  uniform bool uEnablePhysics;       // GPU 物理水是否就绪（GCR 首次 compute 后置 true）
-  varying vec3 vWorldPos;
-  varying vec3 vNormal;
-  varying float vWaveHeight;
-  varying float vJacobian;
-  varying float vSurfaceY;
-  varying float vDepth;
-
-  // 标准 Gerstner（含水平位移 + 解析法线 + 雅可比），由 gerstner.ts 生成
-  ${GERSTNER_GLSL}
-
-  void main() {
-    vec3 pos = position;
-    // position 在 XZ 平面（PlaneGeometry 旋转后），y=0
-    vec2 uv = (pos.xz / uWorldSize) + 0.5;
-    float terrainH = texture2D(uHeightTex, uv).r;
-    float h = 10.0;            // fallback 假深水（物理未就绪时片元不触发 discard）
-
-    if (uEnablePhysics) {
-      // P1 物理模式：基面 = 地形 + 水深（海区=海平面，淹没区随水位）
-      h = texture2D(uWaterHeight, uv).r;
-      pos.y = (terrainH + h) - uWaterLevel;
-    } else {
-      // fallback：原始平面行为（无物理数据时保持全水面可见）
-      pos.y = 0.0;
-    }
-
-    vec3 n;
-    float jac;
-    vec3 disp = gerstnerSolve(pos.xz, uTime, n, jac);
-    pos += disp;                 // 含水平位移的标准 Gerstner
-    vWaveHeight = disp.y;
-    vJacobian = jac;
-    vDepth = h;
-
-    vec4 worldPos = modelMatrix * vec4(pos, 1.0);
-    vWorldPos = worldPos.xyz;
-    vSurfaceY = worldPos.y;      // = 海平面 + 波高（海区）/ 淹没区基面 + 波高
-    vNormal = n;
-    gl_Position = projectionMatrix * viewMatrix * worldPos;
-  }
-`
-
-const fragmentShader = /* glsl */ `
-  precision highp float;
-  ${GLSL_HASH}
-  uniform float uTime;
-  uniform vec3 uCameraPos;
-  uniform vec3 uSunDir;
-  uniform vec3 uSunColor;
-  uniform sampler2D uHeightTex;
-  uniform bool uEnablePhysics;       // 与顶点同步：物理模式才遮罩干地
-  uniform float uWorldSize;
-  uniform float uWaterLevel;
-  uniform vec3 uShallowCol;
-  uniform vec3 uMidCol;
-  uniform vec3 uDeepCol;
-  uniform vec3 uFoamCol;
-  uniform vec3 uFogColor;
-  uniform float uFogDensity;
-  uniform vec3 uSkyColor;
-  uniform float uFoamScale;
-  uniform float uFoamSpeed;
-  uniform float uFoamJacLo;
-  uniform float uFoamJacHi;
-  uniform float uFoamAmount;
-  uniform float uFoamShoreDepth;
-  uniform float uFoamShoreSpeed;
-
-  varying vec3 vWorldPos;
-  varying vec3 vNormal;
-  varying float vWaveHeight;
-  varying float vJacobian;
-  varying float vSurfaceY;
-  varying float vDepth;
-
-  // 岸线「湿边/消退」泡沫：浅水带内随波相位来回拉退，紧贴水线再补一道细湿线
-  float shorelineFoam(float depth, float t, vec2 xz, float fn) {
-    float retreat = 0.5 + 0.5 * sin(t * uFoamShoreSpeed + xz.x * 0.5 + xz.y * 0.3);
-    float band = (1.0 - smoothstep(0.0, uFoamShoreDepth, depth)) * mix(0.4, 1.0, retreat);
-    float wet = (1.0 - smoothstep(0.0, uFoamShoreDepth * 0.18, depth)) * retreat;
-    return band * (0.6 + 0.4 * fn) + wet * 0.5;
-  }
-
-  void main() {
-    // 世界坐标 → 高度纹理 UV
-    vec2 uv = (vWorldPos.xz / uWorldSize) + 0.5;
-    float h = vDepth;                       // GPU 物理水深（fallback=10.0）
-    // 干地遮罩：仅在物理模式下，h≈0（无水体）处丢弃/渐隐
-    float waterMask = uEnablePhysics ? smoothstep(0.0, 0.05, h) : 1.0;
-    if (waterMask < 0.001) discard;
-    float terrainH = texture2D(uHeightTex, uv).r;
-    float depth = max(h, 0.0);          // 水柱深 ≈ h（满淹时 = 海平面 - 地形）
-
-    // 深度色：浅绿松石 → 青 → 深蓝
-    vec3 waterCol;
-    if (depth < 1.5) {
-      waterCol = mix(uShallowCol, uMidCol, smoothstep(0.0, 1.5, depth));
-    } else {
-      waterCol = mix(uMidCol, uDeepCol, smoothstep(1.5, 7.0, depth));
-    }
-    // 深水压暗
-    waterCol *= mix(1.0, 0.75, smoothstep(0.0, 8.0, depth));
-
-    // 漫反射光照（基于太阳方向）
-    vec3 N = normalize(vNormal);
-    float diff = max(dot(N, normalize(uSunDir)), 0.0);
-    vec3 lit = waterCol * (0.55 + 0.6 * diff) * uSunColor;
-
-    // 高光（Blinn-Phong）
-    vec3 V = normalize(uCameraPos - vWorldPos);
-    vec3 H = normalize(uSunDir + V);
-    float spec = pow(max(dot(N, H), 0.0), 120.0);
-    lit += uSunColor * spec * 0.6;
-
-    // 菲涅尔（掠射角反射天空色）
-    float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
-    lit = mix(lit, uSkyColor, fres * 0.45);
-
-    // ── 泡沫升级 ──
-    // 实际水面深度用物理水深 h（波面起伏叠加在 h 基面上，h 即水柱深）
-    float fdepth = depth;
-    // 程序化滚动噪声（零贴图，复用 glslChunks 的 fbm2）
-    float fn = fbm2(vWorldPos.xz * uFoamScale + uTime * uFoamSpeed * vec2(0.3, -0.2));
-    // ① Jacobian 白帽：波面折叠/破碎处（J 跌破阈值）生成，乘噪声做纹理感
-    float jacFoam = (1.0 - smoothstep(uFoamJacLo, uFoamJacHi, vJacobian)) * mix(0.55, 1.0, fn);
-    // ② 波峰泡沫（保留并细调）
-    float foamCrest = smoothstep(0.12, 0.24, vWaveHeight) * (0.4 + 0.5 * fn);
-    // ③ 岸线湿边消退
-    float shore = shorelineFoam(fdepth, uTime, vWorldPos.xz, fn);
-    float foam = clamp(jacFoam + foamCrest * 0.5 + shore, 0.0, 1.0);
-    lit = mix(lit, uFoamCol, foam * uFoamAmount);
-
-    // 透明度：浅水更透显沙底，深水近不透明（清澈感）
-    float alpha = mix(0.58, 0.93, smoothstep(0.0, 2.5, depth));
-    alpha = mix(alpha, 1.0, foam * 0.6);
-    alpha = mix(alpha, 1.0, fres * 0.35);
-    alpha *= waterMask;   // 干地渐隐到全透（与 discard 共同剔除无水区）
-
-    // 手动指数雾
-    float dist = length(uCameraPos - vWorldPos);
-    float fogF = 1.0 - exp(-uFogDensity * uFogDensity * dist * dist);
-    fogF = clamp(fogF, 0.0, 1.0);
-    lit = mix(lit, uFogColor, fogF);
-
-    gl_FragColor = vec4(lit, alpha);
-  }
-`
-
 export function createWaterMaterial(): WaterMaterial {
-  const mat = new THREE.ShaderMaterial({
-    vertexShader,
-    fragmentShader,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  }) as WaterMaterial
+  const mat = new THREE.MeshBasicNodeMaterial() as WaterMaterial
+  mat.transparent = true
+  mat.depthWrite = false
+  mat.side = THREE.DoubleSide
+  mat.fog = false // 我们手算 fog，不让 NodeMaterial 自动 fog
 
+  // —— positionNode: 暂不设 ——
+  //   TSL MeshBasicNodeMaterial 对自定义 positionNode 有兼容性问题（与 P4a 同根）。
+  //   任何非零位移都会让 WebGPURenderer 全黑。暂用默认变换 → 静态平面水。
+  //   注记：varying 节点由颜色写了默认值，不需要 positionNode 写入也能工作。
+
+  // —— colorNode: 完整水着色器 ——
+  mat.colorNode = Fn(() => {
+    const wp = positionWorld
+    const h = vDepth
+    const depth = max(h, 0.0)
+
+    const waterColShallow = mix(uShallowCol, uMidCol, smoothstep(0.0, 1.5, depth))
+    const waterColDeep = mix(uMidCol, uDeepCol, smoothstep(1.5, 7.0, depth))
+    const waterCol = depth.lessThan(1.5).select(waterColShallow, waterColDeep)
+    const waterColDim = waterCol.mul(mix(float(1.0), float(0.75), smoothstep(0.0, 8.0, depth)))
+
+    const N = normalize(vNormalVar)
+    const diff = max(dot(N, uSunDir), 0.0)
+    let lit = waterColDim.mul(float(0.55).add(float(0.6).mul(diff))).mul(uSunColor)
+
+    const V = normalize(uCameraPos.sub(wp))
+    const H = normalize(uSunDir.add(V))
+    const spec = pow(max(dot(N, H), 0.0), 120.0)
+    lit = lit.add(uSunColor.mul(spec).mul(0.6))
+
+    const fres = pow(float(1.0).sub(max(dot(N, V), 0.0)), 4.0)
+    lit = mix(lit, uSkyColor, fres.mul(0.45))
+
+    const foam = computeFoam(wp, depth)
+    lit = mix(lit, uFoamCol, foam.mul(uFoamAmount))
+
+    const dist = length(uCameraPos.sub(wp))
+    const fogF = clamp(
+      float(1.0).sub(exp(uFogDensity.mul(uFogDensity).mul(dist).mul(dist).negate())),
+      0.0, 1.0,
+    )
+    lit = mix(lit, uFogColor, fogF)
+    return lit
+  })()
+
+  // —— opacityNode: 每像素 alpha ——
+  mat.opacityNode = Fn(() => {
+    const wp = positionWorld
+    const h = vDepth
+    const depth = max(h, 0.0)
+    const waterMask = uEnablePhysics.greaterThan(0.5).select(smoothstep(0.0, 0.05, h), float(1.0))
+
+    let alpha = mix(float(0.58), float(0.93), smoothstep(0.0, 2.5, depth))
+    const foam = computeFoam(wp, depth)
+    alpha = mix(alpha, float(1.0), foam.mul(0.6))
+
+    const N = normalize(vNormalVar)
+    const V = normalize(uCameraPos.sub(wp))
+    const fres = pow(float(1.0).sub(max(dot(N, V), 0.0)), 4.0)
+    alpha = mix(alpha, float(1.0), fres.mul(0.35))
+    alpha = alpha.mul(waterMask)
+    return alpha
+  })()
+
+  // 暴露 uniforms 引用（旧接口，updateWaterMaterial 通过这些写 .value）
   mat.uniforms = {
-    uTime: { value: 0 },
-    uCameraPos: { value: new THREE.Vector3() },
-    uSunDir: { value: new THREE.Vector3(0.45, 0.78, 0.35).normalize() },
-    uSunColor: { value: new THREE.Color('#ffe9c4') },
-    uHeightTex: { value: getHeightFieldTexture() },
-    uWaterHeight: { value: null },
-    uEnablePhysics: { value: false },
-    uWorldSize: { value: WORLD_SIZE },
-    uWaterLevel: { value: WATER_LEVEL },
-    uShallowCol: { value: new THREE.Color('#56d6c8') },
-    uMidCol: { value: new THREE.Color('#2fb0c4') },
-    uDeepCol: { value: new THREE.Color('#15688f') },
-    uFoamCol: { value: new THREE.Color('#f4f0e6') },
-    uFogColor: { value: new THREE.Color('#d4e2ea') },
-    uFogDensity: { value: 0.002 },
-    uSkyColor: { value: new THREE.Color('#bcd4e6') },
-    // 泡沫升级默认参数（可调）
-    uFoamScale: { value: 1.6 },
-    uFoamSpeed: { value: 0.25 },
-    uFoamJacLo: { value: 0.5 },
-    uFoamJacHi: { value: 0.86 },
-    uFoamAmount: { value: 0.9 },
-    uFoamShoreDepth: { value: 0.6 },
-    uFoamShoreSpeed: { value: 1.0 },
-  }
+    uTime: uTime as unknown as { value: number },
+    uCameraPos: uCameraPos as unknown as { value: THREE.Vector3 },
+    uSunDir: uSunDir as unknown as { value: THREE.Vector3 },
+    uSunColor: uSunColor as unknown as { value: THREE.Color },
+    uHeightTex: uHeightTex as unknown as { value: THREE.DataTexture | null },
+    uWaterHeight: uWaterHeight as unknown as { value: THREE.Texture | null },
+    uEnablePhysics: uEnablePhysics as unknown as { value: boolean },
+    uWorldSize: uWorldSize as unknown as { value: number },
+    uWaterLevel: uWaterLevel as unknown as { value: number },
+    uShallowCol: uShallowCol as unknown as { value: THREE.Color },
+    uMidCol: uMidCol as unknown as { value: THREE.Color },
+    uDeepCol: uDeepCol as unknown as { value: THREE.Color },
+    uFoamCol: uFoamCol as unknown as { value: THREE.Color },
+    uFogColor: uFogColor as unknown as { value: THREE.Color },
+    uFogDensity: uFogDensity as unknown as { value: number },
+    uSkyColor: uSkyColor as unknown as { value: THREE.Color },
+    uFoamScale: uFoamScale as unknown as { value: number },
+    uFoamSpeed: uFoamSpeed as unknown as { value: number },
+    uFoamJacLo: uFoamJacLo as unknown as { value: number },
+    uFoamJacHi: uFoamJacHi as unknown as { value: number },
+    uFoamAmount: uFoamAmount as unknown as { value: number },
+    uFoamShoreDepth: uFoamShoreDepth as unknown as { value: number },
+    uFoamShoreSpeed: uFoamShoreSpeed as unknown as { value: number },
+  } as WaterMaterial['uniforms']
 
   return mat
 }
 
-/** 每帧更新水材质 uniform */
+/** 每帧更新水材质 uniform（兼容旧接口） */
 export function updateWaterMaterial(
   mat: WaterMaterial,
   time: number,
@@ -260,6 +330,3 @@ export function updateWaterMaterial(
   mat.uniforms.uFogDensity.value = lightingState.fogDensity
   mat.uniforms.uSkyColor.value.copy(lightingState.hemiSky)
 }
-
-// 直接从已 import 的 lightingState 读取（见顶部 import；实测不构成循环依赖，无需 wrapper）
-

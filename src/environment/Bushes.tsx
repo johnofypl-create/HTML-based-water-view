@@ -12,7 +12,7 @@
  * 低多边形球状，压扁，深绿多色。轻摆。
  */
 import { useMemo } from 'react'
-import * as THREE from 'three'
+import * as THREE from 'three/webgpu'
 import InstancedFoliage from './InstancedFoliage'
 import { getVegetation } from './vegetationData'
 import { PALETTE } from '../config/palette'
@@ -31,7 +31,7 @@ export default function Bushes() {
       const n = Math.sin(x * 8 + y * 5) * 0.06
       pos.setXYZ(i, x * 1.15 + n, y * 0.7 + n * 0.5, z * 1.15 - n)
     }
-    g.computeVertexNormals()
+    g.computeVertexNormals(); const bv = g.attributes.position.count; const bu = new Float32Array(bv * 2); for (let i = 0; i < bv; i++) { bu[i * 2] = i / (bv - 1 || 1); bu[i * 2 + 1] = 0; } g.setAttribute("uv", new THREE.BufferAttribute(bu, 2))
     g.translate(0, 0.3, 0)
     return g
   }, [])

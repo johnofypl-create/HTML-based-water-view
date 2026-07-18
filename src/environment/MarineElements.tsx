@@ -16,7 +16,7 @@
  * 小岛：圆柱基底+植被点缀，散布在远海
  */
 import { useMemo, useRef, useLayoutEffect } from 'react'
-import * as THREE from 'three'
+import * as THREE from 'three/webgpu'
 import { heightAt } from '../utils/terrain'
 import { WATER_LEVEL, WORLD_SIZE } from '../config/constants'
 import { registerSplashTarget } from '../water/state/splashTargets'
@@ -163,7 +163,7 @@ export default function MarineElements() {
   const plantGeo = useMemo(() => new THREE.CylinderGeometry(0.5, 0.3, 1, 5), [])
   const boxGeo = useMemo(() => new THREE.BoxGeometry(1, 1, 1), [])
   const cylGeo = useMemo(() => new THREE.CylinderGeometry(0.5, 0.5, 1, 8), [])
-  const shrubGeo = useMemo(() => new THREE.IcosahedronGeometry(0.5, 0), [])
+  const shrubGeo = useMemo(() => { const g = new THREE.IcosahedronGeometry(0.5, 0); const c = g.attributes.position.count; const u = new Float32Array(c * 2); for (let i = 0; i < c; i++) { u[i * 2] = i / (c - 1 || 1); u[i * 2 + 1] = 0; } g.setAttribute("uv", new THREE.BufferAttribute(u, 2)); return g }, [])
 
   // 材质
   const coralMat = useMemo(() => new THREE.MeshStandardMaterial({ flatShading: true, vertexColors: true }), [])

@@ -33,6 +33,11 @@ export default function Particles() {
     initialPositions.current = new Float32Array(positions)
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    // UV：避免 TSL PBR 警告（uv not found）
+    const pCount = positions.length / 3
+    const pUV = new Float32Array(pCount * 2)
+    for (let i = 0; i < pCount; i++) { pUV[i * 2] = i / (pCount - 1 || 1); pUV[i * 2 + 1] = 0 }
+    geo.setAttribute('uv', new THREE.BufferAttribute(pUV, 2))
     return geo
   }, [])
 

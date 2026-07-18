@@ -12,7 +12,7 @@
  * 小花球（茎被草丛遮盖），多色变化（白/黄/粉/淡紫），顶端轻摇。
  */
 import { useMemo } from 'react'
-import * as THREE from 'three'
+import * as THREE from 'three/webgpu'
 import InstancedFoliage from './InstancedFoliage'
 import { getVegetation } from './vegetationData'
 import { PALETTE } from '../config/palette'
@@ -31,6 +31,7 @@ export default function Flowers() {
     // 单一花球，居中略高
     const g = new THREE.IcosahedronGeometry(0.055, 0)
     g.translate(0, 0.2, 0)
+  const fv = g.attributes.position.count; const fu = new Float32Array(fv * 2); for (let i = 0; i < fv; i++) { fu[i * 2] = i / (fv - 1 || 1); fu[i * 2 + 1] = 0; }; g.setAttribute("uv", new THREE.BufferAttribute(fu, 2))
     return g
   }, [])
 

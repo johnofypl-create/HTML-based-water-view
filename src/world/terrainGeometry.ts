@@ -140,6 +140,10 @@ export function createTerrainGeometry(): TerrainGeometryResult {
   geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
   geometry.setAttribute('aSide', new THREE.BufferAttribute(sides, 1))
   geometry.setAttribute('aHeight', new THREE.BufferAttribute(heights, 1))
+  // UV：避免 TSL PBR 警告（uv not found）
+  const tUV = new Float32Array((positions.length / 3) * 2)
+  for (let i = 0; i < positions.length / 3; i++) { tUV[i * 2] = i / (positions.length / 3 - 1 || 1); tUV[i * 2 + 1] = 0 }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(tUV, 2))
   geometry.setIndex(indices)
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()

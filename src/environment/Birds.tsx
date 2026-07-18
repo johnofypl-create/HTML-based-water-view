@@ -45,6 +45,10 @@ export default function Birds() {
     ])
     g.setAttribute('position', new THREE.BufferAttribute(verts, 3))
     g.computeVertexNormals()
+    // UV：避免 TSL PBR 警告（uv not found）— MeshBasicMaterial 不需，但 WebGPU 通用 safety
+    const bUV = new Float32Array(6 * 2)
+    for (let i = 0; i < 6; i++) { bUV[i * 2] = i / 5; bUV[i * 2 + 1] = 0 }
+    g.setAttribute('uv', new THREE.BufferAttribute(bUV, 2))
     return g
   }, [])
 

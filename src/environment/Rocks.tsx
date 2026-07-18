@@ -13,7 +13,7 @@
  * 用 sampling 采样放置（含浅水区）。阶段2 会并入完整 Vegetation 总管。
  */
 import { useMemo, useRef, useLayoutEffect } from 'react'
-import * as THREE from 'three'
+import * as THREE from 'three/webgpu'
 import { sampleVegetation } from '../utils/sampling'
 import { PERF, SEED } from '../config/constants'
 import { registerSplashTarget } from '../water/state/splashTargets'
@@ -32,7 +32,7 @@ export default function Rocks() {
       const n = 0.15 * (Math.sin(x * 12.9 + y * 78.2) * 0.5 + 0.5)
       pos.setXYZ(i, x + n, y + n * 0.7, z - n * 0.5)
     }
-    g.computeVertexNormals()
+    g.computeVertexNormals(); const __vc = g.attributes.position.count; const __uv = new Float32Array(__vc * 2); for (let __i = 0; __i < __vc; __i++) { __uv[__i * 2] = __i / (__vc - 1 || 1); __uv[__i * 2 + 1] = 0; } g.setAttribute("uv", new THREE.BufferAttribute(__uv, 2))
     return g
   }, [])
 

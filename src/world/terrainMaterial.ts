@@ -1,27 +1,58 @@
 /**
  * @module world/terrainMaterial
  * @layer world（域层）
- * @purpose 地形材质工厂（生物群系配色 + 噪声细节）
- * @dependsOn ['utils/glslChunks', 'config/constants']
+ * @purpose 地形材质工厂（生物群系配色 + 噪声细节）—— WebGPU/TSL 版
+ * @dependsOn ['config/constants']
  * @exports [TerrainMaterial, createTerrainMaterial, updateTerrainMaterial]
  * @aiEdit
  *   - 改本文件导出的 TerrainMaterial、createTerrainMaterial、updateTerrainMaterial 即可；依赖见 @dependsOn
  */
 /**
- * 地形材质
- * MeshStandardMaterial + onBeforeCompile，注入：
- *  1. biome 混色（按高度 + 坡度）
- *  2. 水下焦散（worldY < waterLevel 时加 voronoi 暖光）
- *  3. 侧面岩层条纹（aSide=1 按 aHeight 做沙/壤/岩交替）→ 物理模型感
- *  4. 噪声微变化避免单调
+ * 地形材质（TSL 节点版）
  *
- * 用 onBeforeCompile 而非纯 ShaderMaterial：自动兼容 PBR 光照、fog、阴影、tonemapping。
+ * 原实现基于 MeshStandardMaterial.onBeforeCompile 注入 GLSL；WebGPU 下
+ * onBeforeCompile 不工作，改为 MeshStandardNodeMaterial + colorNode（TSL）。
+ * 逻辑完全等价：
+ *  1. biome 混色（按高度 aHeight + 坡度 normalWorld）
+ *  2. 侧面岩层条纹（aSide=1 时按 aHeight 做沙/壤/岩交替）
+ *  3. 水下焦散（worldY < waterLevel 时加双层 voronoi 暖光）
+ *  4. 饱和度补偿（抵消 ACES tonemapping 降饱和）
+ *
+ * colorNode 只提供反照率（diffuse），PBR 光照 / fog / 阴影 / tonemapping 由
+ * MeshStandardNodeMaterial 自动承接（等价原 onBeforeCompile 改 diffuseColor 的思路）。
  */
-import * as THREE from 'three'
-import { GLSL_HASH, GLSL_VORONOI } from '../utils/glslChunks'
+import * as THREE from 'three/webgpu'
+import * as TSL from 'three/tsl'
 import { WATER_LEVEL } from '../config/constants'
 
-export interface TerrainMaterial extends THREE.MeshStandardMaterial {
+// @types/three 的 TSL 节点类型标注过窄（swizzle / Fn 调用参数会被误报），
+// 统一以 any 视图解构，节点方法链按运行期真实 API 使用。
+const {
+  Fn,
+  float,
+  vec2,
+  vec3,
+  uniform,
+  attribute,
+  positionWorld,
+  normalWorld,
+  floor,
+  fract,
+  sin,
+  dot,
+  pow,
+  sqrt,
+  max,
+  min,
+  clamp,
+  mix,
+  smoothstep,
+  acos,
+  Loop,
+  If,
+} = TSL as any
+
+export interface TerrainMaterial extends THREE.MeshStandardNodeMaterial {
   uniforms: {
     uTime: { value: number }
     uWaterLevel: { value: number }
@@ -33,176 +64,195 @@ export interface TerrainMaterial extends THREE.MeshStandardMaterial {
   }
 }
 
+// ============ TSL 复用函数（等价 utils/glslChunks 的 GLSL_HASH / GLSL_VORONOI）============
+
+/** hash21：vec2 → float 哈希 */
+const hash21 = Fn(([p]: any) => {
+  const p3 = fract(vec3(p.x, p.y, p.x).mul(0.1031)).toVar()
+  p3.addAssign(dot(p3, p3.yzx.add(33.33)))
+  return fract(p3.x.add(p3.y).mul(p3.z))
+})
+
+/** vnoise：2D 值噪声 */
+const vnoise = Fn(([p]: any) => {
+  const i = floor(p).toVar()
+  const f = fract(p).toVar()
+  const u = f.mul(f).mul(float(3.0).sub(f.mul(2.0))).toVar()
+  const a = hash21(i)
+  const b = hash21(i.add(vec2(1.0, 0.0)))
+  const c = hash21(i.add(vec2(0.0, 1.0)))
+  const d = hash21(i.add(vec2(1.0, 1.0)))
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y)
+})
+
+/** voronoi3：3D voronoi（用于水下焦散），返回 vec3(sqrt(md), id, 8) */
+const voronoi3 = Fn(([x]: any) => {
+  const p = floor(x).toVar()
+  const f = fract(x).toVar()
+  const id = float(0.0).toVar()
+  const md = float(8.0).toVar()
+
+  Loop({ start: -1, end: 2 }, ({ i: kk }: any) => {
+    Loop({ start: -1, end: 2 }, ({ i: jj }: any) => {
+      Loop({ start: -1, end: 2 }, ({ i: ii }: any) => {
+        const b = vec3(float(ii), float(jj), float(kk)).toVar()
+        const pb = p.add(b).toVar()
+        const hv = hash21(pb.xy.add(pb.z.mul(17.0)))
+        const s = sin(hv.mul(6.2831)).mul(0.5)
+        const r = b.add(0.5).add(s)
+        const d = b.sub(f).add(r)
+        const dd = dot(d, d)
+        If(dd.lessThan(md), () => {
+          md.assign(dd)
+          id.assign(hash21(pb.xy))
+        })
+      })
+    })
+  })
+
+  return vec3(sqrt(md), id, float(8.0))
+})
+
+// ============ 自然调色板（提亮+增饱和，向明亮玩具感靠拢）============
+const sandDry = vec3(0.9, 0.81, 0.64)
+const sandWet = vec3(0.77, 0.65, 0.49)
+const duneCol = vec3(0.84, 0.73, 0.56)
+const grassBright = vec3(0.62, 0.7, 0.42)
+const grassMid = vec3(0.52, 0.61, 0.33)
+const grassDry = vec3(0.7, 0.66, 0.42)
+const forestMid = vec3(0.28, 0.42, 0.27)
+const forestLight = vec3(0.35, 0.5, 0.3)
+const rockLight = vec3(0.64, 0.6, 0.56)
+const rockMid = vec3(0.52, 0.47, 0.43)
+const rockDark = vec3(0.39, 0.34, 0.3)
+const wetSeaBed = vec3(0.58, 0.55, 0.45)
+const deepSeaBed = vec3(0.33, 0.37, 0.41)
+
+/** 顶面 biome 颜色（按高度 h + 坡度 slope + 世界 xz） */
+const topBiomeColor = Fn(([h, slope, wp]: any) => {
+  const n = vnoise(wp.mul(0.5)).mul(0.05).sub(0.025) // 微变化（大色块感）
+  const col = vec3(0.0).toVar()
+  If(h.lessThan(-2.0), () => {
+    col.assign(mix(deepSeaBed, wetSeaBed, smoothstep(-4.0, -2.0, h)))
+  })
+    .ElseIf(h.lessThan(-0.35), () => {
+      col.assign(mix(wetSeaBed, sandWet, smoothstep(-2.0, -0.35, h)))
+    })
+    .ElseIf(h.lessThan(0.12), () => {
+      col.assign(mix(sandWet, sandDry, smoothstep(-0.35, 0.12, h)))
+    })
+    .ElseIf(h.lessThan(0.55), () => {
+      col.assign(mix(sandDry, duneCol, smoothstep(0.12, 0.55, h)))
+    })
+    .ElseIf(h.lessThan(1.1), () => {
+      const g = smoothstep(0.6, 1.1, h)
+      col.assign(mix(duneCol, mix(grassDry, grassBright, 0.5), g))
+    })
+    .ElseIf(slope.greaterThan(0.56), () => {
+      // ~32°
+      col.assign(mix(rockMid, rockDark, vnoise(wp.mul(0.3))))
+    })
+    .ElseIf(h.lessThan(2.6), () => {
+      col.assign(mix(grassBright, grassMid, vnoise(wp.mul(0.4))))
+    })
+    .ElseIf(h.lessThan(5.2), () => {
+      const t = smoothstep(2.6, 5.2, h)
+      const g = mix(grassMid, grassBright, 0.4)
+      col.assign(mix(g, mix(forestLight, forestMid, vnoise(wp.mul(0.5))), t))
+      If(slope.greaterThan(0.49), () => {
+        // ~28°
+        col.assign(mix(col, rockMid, 0.4))
+      })
+    })
+    .Else(() => {
+      col.assign(mix(rockMid, rockLight, vnoise(wp.mul(0.25))))
+    })
+  return col.add(n)
+})
+
+/** 侧面岩层条纹（物理模型截面） */
+const sideStrataColor = Fn(([h, wp]: any) => {
+  const bands = sin(h.mul(1.8).add(vnoise(wp.mul(0.15)).mul(1.5)))
+  const sand = vec3(0.79, 0.69, 0.53)
+  const soil = vec3(0.48, 0.39, 0.31)
+  const rock = vec3(0.36, 0.32, 0.28)
+  const col = mix(soil, rock, smoothstep(0.0, 1.0, bands)).toVar()
+  col.assign(mix(sand, col, smoothstep(-1.0, 0.5, bands).mul(0.7)))
+  col.addAssign(vnoise(wp.mul(3.0)).sub(0.5).mul(0.05)) // 细节噪声
+  col.mulAssign(float(0.7).add(smoothstep(-9.0, 0.0, h).mul(0.3))) // 底部偏暗
+  return col
+})
+
 export function createTerrainMaterial(): TerrainMaterial {
-  const mat = new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshStandardNodeMaterial({
     color: new THREE.Color('#6f8246'),
     roughness: 0.92,
     metalness: 0.0,
     flatShading: false,
   }) as TerrainMaterial
 
-  const uniforms = {
-    uTime: { value: 0 },
-    uWaterLevel: { value: WATER_LEVEL },
+  // TSL uniform 节点（.value 与旧接口一致，updateTerrainMaterial 每帧写入）
+  const uTime = uniform(0)
+  const uWaterLevel = uniform(WATER_LEVEL)
+  const uSunColor = uniform(new THREE.Color('#fff0d0'))
+  const uCausticStrength = uniform(0.6)
+
+  /** 水下焦散（双层 voronoi） */
+  const causticColor = Fn(([wp, depth]: any) => {
+    const t = uTime.mul(0.4)
+    // 层1：大尺度，慢移动
+    const c1 = voronoi3(wp.mul(0.55).add(vec3(t.mul(0.5), 0.0, t.mul(0.4))))
+    const c2 = voronoi3(wp.mul(0.55).add(vec3(t.mul(-0.6), t.mul(0.4), 0.0)).add(11.0))
+    const caustic1 = pow(float(1.0).sub(min(c1.x, c2.x)), 6.0)
+    // 层2：小尺度，快移动，更锐利
+    const c3 = voronoi3(wp.mul(1.3).add(vec3(t.mul(0.7), t.mul(0.3), t.mul(-0.5))).add(5.0))
+    const caustic2 = pow(float(1.0).sub(c3.x), 3.5).mul(0.55)
+    const caustic = max(caustic1, caustic2)
+    const atten = clamp(float(1.0).sub(depth.div(5.0)), 0.0, 1.0)
+    return uSunColor.mul(caustic).mul(atten).mul(uCausticStrength)
+  })
+
+  // ---- colorNode：反照率（等价原 onBeforeCompile 改 diffuseColor.rgb）----
+  mat.colorNode = Fn(() => {
+    const vHeight = attribute('aHeight')
+    const vSide = attribute('aSide')
+    const wp = positionWorld.xz.toVar()
+    const outCol = vec3(0.0).toVar()
+
+    If(vSide.greaterThan(0.5), () => {
+      // 侧面岩层条纹
+      outCol.assign(sideStrataColor(vHeight, wp))
+    }).Else(() => {
+      // 顶面 biome
+      const slope = acos(clamp(normalWorld.y, -1.0, 1.0))
+      outCol.assign(topBiomeColor(vHeight, slope, wp))
+      // 水下焦散
+      If(positionWorld.y.lessThan(uWaterLevel), () => {
+        const depth = uWaterLevel.sub(positionWorld.y)
+        outCol.addAssign(causticColor(positionWorld, depth))
+        // 水下整体偏冷偏暗
+        outCol.mulAssign(mix(float(1.0), float(0.55), smoothstep(0.0, 3.0, depth)))
+      })
+      // 饱和度补偿（ACES tonemapping 会降饱和，主动拉回）
+      const lum = dot(outCol, vec3(0.299, 0.587, 0.114))
+      outCol.assign(mix(outCol, outCol.mul(1.18).sub(lum.mul(0.09)), 0.55))
+    })
+
+    return outCol
+  })()
+
+  // 保留 uniforms 引用供 updateTerrainMaterial（uSunDir/uFogColor/uFogDensity 当前
+  // 不参与节点图，占位以维持接口稳定）
+  mat.uniforms = {
+    uTime,
+    uWaterLevel: uWaterLevel as unknown as { value: number },
     uSunDir: { value: new THREE.Vector3(0.4, 0.8, 0.3).normalize() },
-    uSunColor: { value: new THREE.Color('#fff0d0') },
-    uCausticStrength: { value: 0.6 },
+    uSunColor: uSunColor as unknown as { value: THREE.Color },
+    uCausticStrength: uCausticStrength as unknown as { value: number },
     uFogColor: { value: new THREE.Color('#cfe0e8') },
     uFogDensity: { value: 0.012 },
-  }
-  mat.uniforms = uniforms
+  } as TerrainMaterial['uniforms']
 
-  mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms)
-
-    // ---- 顶点：传世界坐标、高度、侧面标记 ----
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-         attribute float aSide;
-         attribute float aHeight;
-         varying vec3 vWorldPos;
-         varying float vSide;
-         varying float vHeight;
-         varying vec3 vWorldNormal;`,
-      )
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-         vSide = aSide;
-         vHeight = aHeight;`,
-      )
-      .replace(
-        '#include <worldpos_vertex>',
-        `#include <worldpos_vertex>
-         vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-         vWorldNormal = normalize(mat3(modelMatrix) * normal);`,
-      )
-
-    // ---- 片段：biome 混色 + 焦散 + 侧面条纹 ----
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-         ${GLSL_HASH}
-         ${GLSL_VORONOI}
-         uniform float uTime;
-         uniform float uWaterLevel;
-         uniform vec3 uSunDir;
-         uniform vec3 uSunColor;
-         uniform float uCausticStrength;
-         varying vec3 vWorldPos;
-         varying float vSide;
-         varying float vHeight;
-         varying vec3 vWorldNormal;
-
-         // 自然调色板（提亮+增饱和，向明亮玩具感靠拢）
-         vec3 sandDry()   { return vec3(0.90, 0.81, 0.64); }
-         vec3 sandWet()   { return vec3(0.77, 0.65, 0.49); }
-         vec3 duneCol()   { return vec3(0.84, 0.73, 0.56); }
-         vec3 grassBright(){ return vec3(0.62, 0.70, 0.42); }
-         vec3 grassMid()  { return vec3(0.52, 0.61, 0.33); }
-         vec3 grassDry()  { return vec3(0.70, 0.66, 0.42); }
-         vec3 bushCol()   { return vec3(0.30, 0.42, 0.25); }
-         vec3 forestDeep(){ return vec3(0.21, 0.33, 0.22); }
-         vec3 forestMid() { return vec3(0.28, 0.42, 0.27); }
-         vec3 forestLight(){ return vec3(0.35, 0.50, 0.30); }
-         vec3 rockLight() { return vec3(0.64, 0.60, 0.56); }
-         vec3 rockMid()   { return vec3(0.52, 0.47, 0.43); }
-         vec3 rockDark()  { return vec3(0.39, 0.34, 0.30); }
-         vec3 wetSeaBed() { return vec3(0.58, 0.55, 0.45); }
-         vec3 deepSeaBed(){ return vec3(0.33, 0.37, 0.41); }
-
-         // 顶面 biome 颜色（按高度 + 坡度）
-         vec3 topBiomeColor(float h, float slope, vec2 wp) {
-           float n = vnoise(wp * 0.5) * 0.05 - 0.025; // 微变化（减弱，大色块感）
-           vec3 col;
-           if (h < -2.0) {
-             col = mix(deepSeaBed(), wetSeaBed(), smoothstep(-4.0, -2.0, h));
-           } else if (h < -0.35) {
-             col = mix(wetSeaBed(), sandWet(), smoothstep(-2.0, -0.35, h));
-           } else if (h < 0.12) {
-             col = mix(sandWet(), sandDry(), smoothstep(-0.35, 0.12, h));
-           } else if (h < 0.55) {
-             col = mix(sandDry(), duneCol(), smoothstep(0.12, 0.55, h));
-           } else if (h < 1.1) {
-             float g = smoothstep(0.6, 1.1, h);
-             col = mix(duneCol(), mix(grassDry(), grassBright(), 0.5), g);
-           } else if (slope > 0.56) { // ~32°
-             col = mix(rockMid(), rockDark(), vnoise(wp * 0.3));
-           } else if (h < 2.6) {
-             col = mix(grassBright(), grassMid(), vnoise(wp * 0.4));
-           } else if (h < 5.2) {
-             float t = smoothstep(2.6, 5.2, h);
-             vec3 g = mix(grassMid(), grassBright(), 0.4);
-             col = mix(g, mix(forestLight(), forestMid(), vnoise(wp*0.5)), t);
-             if (slope > 0.49) col = mix(col, rockMid(), 0.4); // ~28°
-           } else {
-             col = mix(rockMid(), rockLight(), vnoise(wp * 0.25));
-           }
-           return col + n;
-         }
-
-         // 侧面岩层条纹（物理模型截面）
-         vec3 sideStrataColor(float h, vec2 wp) {
-           // 按高度分层：沙/壤/岩交替
-           float bands = sin(h * 1.8 + vnoise(wp * 0.15) * 1.5);
-           vec3 sand = vec3(0.79, 0.69, 0.53);
-           vec3 soil = vec3(0.48, 0.39, 0.31);
-           vec3 rock = vec3(0.36, 0.32, 0.28);
-           vec3 col = mix(soil, rock, smoothstep(0.0, 1.0, bands));
-           col = mix(sand, col, smoothstep(-1.0, 0.5, bands) * 0.7);
-           // 细节噪声
-           col += (vnoise(wp * 3.0) - 0.5) * 0.05;
-           // 底部偏暗
-           col *= 0.7 + 0.3 * smoothstep(-9.0, 0.0, h);
-           return col;
-         }
-
-         // 水下焦散（双层 voronoi，更丰富的光斑）
-         vec3 causticColor(vec3 wp, float depth) {
-           float t = uTime * 0.4;
-           // 层1：大尺度，慢移动
-           vec3 c1 = voronoi3(wp * 0.55 + vec3(t * 0.5, 0.0, t * 0.4));
-           vec3 c2 = voronoi3(wp * 0.55 + vec3(-t * 0.6, t * 0.4, 0.0) + 11.0);
-           float caustic1 = pow(1.0 - min(c1.x, c2.x), 6.0);
-           // 层2：小尺度，快移动，更锐利
-           vec3 c3 = voronoi3(wp * 1.3 + vec3(t * 0.7, t * 0.3, -t * 0.5) + 5.0);
-           float caustic2 = pow(1.0 - c3.x, 3.5) * 0.55;
-           float caustic = max(caustic1, caustic2);
-           float atten = clamp(1.0 - depth / 5.0, 0.0, 1.0);
-           return uSunColor * caustic * atten * uCausticStrength;
-         }
-        `,
-      )
-      .replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-         vec2 wp = vWorldPos.xz;
-         if (vSide > 0.5) {
-           // 侧面岩层条纹
-           diffuseColor.rgb = sideStrataColor(vHeight, wp);
-         } else {
-           // 顶面 biome
-           float slope = acos(clamp(vWorldNormal.y, -1.0, 1.0));
-           diffuseColor.rgb = topBiomeColor(vHeight, slope, wp);
-           // 水下焦散
-           if (vWorldPos.y < uWaterLevel) {
-             float depth = uWaterLevel - vWorldPos.y;
-             diffuseColor.rgb += causticColor(vWorldPos, depth);
-             // 水下整体偏冷偏暗
-            diffuseColor.rgb *= mix(1.0, 0.55, smoothstep(0.0, 3.0, depth));
-          }
-          // 饱和度补偿（ACES tonemapping 会降饱和，主动拉回）
-          float lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.18 - lum * 0.09, 0.55);
-        }
-        `,
-      )
-  }
-
-  mat.customProgramCacheKey = () => 'terrain-material-v1'
   return mat
 }
 

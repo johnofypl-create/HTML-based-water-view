@@ -25,7 +25,7 @@ import * as THREE from 'three/webgpu'
 import * as TSL from 'three/tsl'
 
 // @types/three 的 TSL 节点类型标注过窄，统一以 any 视图解构。
-const { Fn, attribute, positionLocal, uniform, pow, sin } = TSL as any
+const { Fn, attribute, positionLocal, uniform, pow, sin, vec3 } = TSL as any
 
 export interface SwayUniforms {
   uTime: { value: number }
@@ -90,6 +90,13 @@ export function makeSwayMaterial(
 
     return pos
   })()
+
+  // —— normalNode: 常量世界 up 法线 ——
+  //   修复 foliage 黑色剪影 bug：positionNode 改顶点后，TSL 默认 normalLocal → normalView
+  //   流程计算的法线指向错误方向，PBR diffuse 几乎为 0 → 渲染为黑色。
+  //   用常量 vec3(0,1,0) 强制世界 up 法线，foliage 不再黑（视觉简化为单侧光，但能正确显示）
+  mat.normalNode = vec3(0.0, 1.0, 0.0)
+  mat.flatShading = true
 
   const uniforms: SwayUniforms = {
     uTime: uTime as unknown as { value: number },

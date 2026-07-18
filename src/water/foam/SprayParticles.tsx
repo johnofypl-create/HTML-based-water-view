@@ -67,7 +67,17 @@ export default function SprayParticles() {
       -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0,
       -0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0,
     ])
+    const norms = new Float32Array([
+      0, 0, 1, 0, 0, 1, 0, 0, 1,
+      0, 0, 1, 0, 0, 1, 0, 0, 1,
+    ])
+    const uvs = new Float32Array([
+      0, 0, 1, 0, 1, 1,
+      0, 0, 1, 1, 0, 1,
+    ])
     g.setAttribute('position', new THREE.BufferAttribute(vert, 3))
+    g.setAttribute('normal', new THREE.BufferAttribute(norms, 3))
+    g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 200)
     return g
   }, [])
@@ -84,6 +94,7 @@ export default function SprayParticles() {
     const uOpacity = uniform(SPRAY.opacity)
 
     const mat = new THREE.MeshStandardNodeMaterial()
+    mat.flatShading = true
     mat.transparent = true
     mat.depthWrite = false
     mat.blending = THREE.NormalBlending

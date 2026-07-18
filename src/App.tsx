@@ -13,7 +13,7 @@
  */
 import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
-import * as THREE from 'three'
+import * as THREE from 'three/webgpu'
 import Terrain from './world/Terrain'
 import Water from './water/Water'
 import Structures from './world/Structures'
@@ -53,23 +53,24 @@ export default function App() {
         frameloop="always"
         shadows
         dpr={[1, PERF.maxDpr]}
-        gl={{
-          antialias: false,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.28,
-          powerPreference: 'high-performance',
+        gl={async (props: any) => {
+          const useWebGL = new URLSearchParams(window.location.search).has("webgl"); const renderer = new THREE.WebGPURenderer({
+            ...props,
+            antialias: false,
+            powerPreference: "high-performance", forceWebGL: useWebGL,
+          })
+          await renderer.init()
+          renderer.outputColorSpace = THREE.SRGBColorSpace
+          renderer.toneMapping = THREE.ACESFilmicToneMapping
+          renderer.toneMappingExposure = 1.28
+          renderer.shadowMap.type = THREE.PCFShadowMap
+          return renderer
         }}
         camera={{
           fov: 42,
           near: 0.1,
           far: 1000,
           position: CAMERA.initialPosition,
-        }}
-        onCreated={({ gl }) => {
-          gl.outputColorSpace = THREE.SRGBColorSpace
-          gl.toneMapping = THREE.ACESFilmicToneMapping
-          gl.toneMappingExposure = 1.28
-          gl.shadowMap.type = THREE.PCFShadowMap
         }}
       >
         <Suspense fallback={null}>
